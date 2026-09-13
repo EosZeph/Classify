@@ -1,3 +1,4 @@
+![Image text](https://github.com/EosZeph/Classify/blob/main/icons/icon-128.png)
 # 归类采集工作台
 
 一个可直接加载到 Chrome / Edge 的 Manifest V3 扩展，用于把网页中选中的文本按类别归档到本地项目工作台。
