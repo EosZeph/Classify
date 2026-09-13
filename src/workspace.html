@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>归类采集工作台</title>
+    <link rel="stylesheet" href="workspace.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <header class="sidebar-header">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 7.5h16" />
+              <path d="M6.5 4h11l2.5 3.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-11L6.5 4Z" />
+              <path d="M9 12h6" />
+              <path d="M9 16h4" />
+            </svg>
+          </span>
+          <div>
+            <p class="eyebrow">本地采集归档</p>
+            <h1>归类采集</h1>
+          </div>
+        </header>
+
+        <button id="sidebar-new-project" class="new-project-button" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <span>新建项目</span>
+        </button>
+
+        <button
+          id="workspace-collection-toggle"
+          class="workspace-collection-toggle"
+          type="button"
+        >
+          <span class="status-dot"></span>
+          <span id="workspace-collection-label">采集已启动</span>
+        </button>
+
+        <div class="sidebar-section-heading">
+          <span>项目</span>
+          <span id="sidebar-project-count" class="count-badge">0</span>
+        </div>
+        <nav id="project-list" class="project-list" aria-label="项目列表"></nav>
+
+        <footer class="sidebar-footer">
+          <div class="sidebar-privacy">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.6 2.9 8.4 7 10 4.1-1.6 7-5.4 7-10V6l-7-3Z" />
+              <path d="m9.5 12 1.7 1.7 3.6-4" />
+            </svg>
+            <span>数据仅保存在本机 · 作者 Eoszeph</span>
+          </div>
+          <button
+            id="clean-legacy-data"
+            class="footer-action"
+            type="button"
+            title="清理旧版空白项目"
+          >
+            数据清理
+          </button>
+        </footer>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div class="project-heading">
+            <p class="eyebrow">当前项目</p>
+            <div class="title-row">
+              <h2 id="project-title">未选择项目</h2>
+              <button
+                id="rename-project"
+                class="icon-button"
+                type="button"
+                title="修改项目名称"
+                aria-label="修改项目名称"
+                disabled
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+            </div>
+            <p id="project-meta" class="project-meta">创建或选择一个项目开始归档</p>
+          </div>
+
+          <div class="header-actions">
+            <button
+              id="export-text"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3v12" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+              <span>下载文本</span>
+            </button>
+            <button
+              id="export-csv"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3v12" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+              <span>CSV</span>
+            </button>
+            <button
+              id="add-category"
+              class="primary-button"
+              type="button"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>新增类别</span>
+            </button>
+            <button
+              id="delete-project"
+              class="icon-button danger-icon"
+              type="button"
+              title="删除当前项目"
+              aria-label="删除当前项目"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="m19 6-1 14H6L5 6" />
+                <path d="M10 11v5" />
+                <path d="M14 11v5" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="workspace-toolbar" aria-label="项目概览">
+          <div class="stat-block">
+            <span class="stat-label">类别</span>
+            <strong id="category-count">0</strong>
+          </div>
+          <div class="stat-block">
+            <span class="stat-label">已采集</span>
+            <strong id="item-count">0</strong>
+          </div>
+          <div class="stat-block stat-block-wide">
+            <span class="stat-label">最近更新</span>
+            <strong id="updated-at">--</strong>
+          </div>
+          <label class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-4-4" />
+            </svg>
+            <input
+              id="search-input"
+              type="search"
+              placeholder="搜索内容、来源或类别"
+              autocomplete="off"
+              disabled
+            />
+          </label>
+        </section>
+
+        <section class="workspace-content">
+          <div id="category-grid" class="category-grid"></div>
+          <div id="empty-workspace" class="empty-workspace">
+            <span class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 7.5h16" />
+                <path d="M6.5 4h11l2.5 3.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-11L6.5 4Z" />
+                <path d="M9 13h6" />
+              </svg>
+            </span>
+            <h2 id="empty-title">还没有项目</h2>
+            <p id="empty-description">
+              创建项目后，可在任意网页选中文字并选择类别进行采集。
+            </p>
+            <button id="empty-new-project" class="primary-button" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>新建项目</span>
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="project-dialog" class="modal">
+      <form id="project-form" class="modal-content">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">项目设置</p>
+            <h2 id="project-dialog-title">新建项目</h2>
+          </div>
+          <button
+            class="icon-button modal-close"
+            type="button"
+            aria-label="关闭"
+            title="关闭"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <label class="field">
+          <span>项目名称</span>
+          <input
+            id="project-name-input"
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+            required
+          />
+        </label>
+        <section id="project-category-builder" class="project-category-builder">
+          <div class="builder-title-row">
+            <div>
+              <strong>项目类别</strong>
+              <span>勾选预设类别，也可添加自定义类别</span>
+            </div>
+          </div>
+          <div id="project-preset-options" class="project-preset-options"></div>
+          <div class="project-custom-input">
+            <input
+              id="project-custom-category-name"
+              type="text"
+              maxlength="40"
+              placeholder="输入自定义类别名称"
+              autocomplete="off"
+            />
+            <button id="project-add-custom-category" type="button">
+              添加类别
+            </button>
+          </div>
+          <div
+            id="project-custom-category-list"
+            class="project-custom-category-list"
+          ></div>
+        </section>
+        <p id="project-form-error" class="error-message" role="alert"></p>
+        <div class="modal-actions">
+          <button class="text-button modal-close" type="button">取消</button>
+          <button id="project-submit" class="primary-button" type="submit">
+            创建项目
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="category-dialog" class="modal">
+      <form id="category-form" class="modal-content">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">类别设置</p>
+            <h2 id="category-dialog-title">新增类别</h2>
+          </div>
+          <button
+            class="icon-button modal-close"
+            type="button"
+            aria-label="关闭"
+            title="关闭"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>类别名称</span>
+            <input
+              id="category-name-input"
+              type="text"
+              maxlength="40"
+              placeholder="例如：公司"
+              autocomplete="off"
+              required
+            />
+          </label>
+          <label class="field">
+            <span>类别说明</span>
+            <input
+              id="category-description-input"
+              type="text"
+              maxlength="160"
+              placeholder="用于提示采集内容"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+        <fieldset class="color-field">
+          <legend>识别颜色</legend>
+          <div id="color-swatches" class="color-swatches"></div>
+          <input id="category-color-input" type="hidden" value="#2563eb" />
+        </fieldset>
+        <p id="category-form-error" class="error-message" role="alert"></p>
+        <div class="modal-actions">
+          <button class="text-button modal-close" type="button">取消</button>
+          <button id="category-submit" class="primary-button" type="submit">
+            保存类别
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="export-dialog" class="modal export-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">文本下载</p>
+            <h2>选择需要下载的内容</h2>
+          </div>
+          <button
+            class="icon-button modal-close"
+            type="button"
+            aria-label="关闭"
+            title="关闭"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <label class="field">
+          <span>选择项目</span>
+          <select id="export-project-select"></select>
+        </label>
+
+        <label class="field export-format-field">
+          <span>下载格式</span>
+          <select id="export-file-format">
+            <option value="txt">文本文件（TXT）</option>
+            <option value="docx">Word 文档（DOCX）</option>
+          </select>
+        </label>
+
+        <div class="export-toolbar">
+          <span id="export-selection-count">已选择 0 条内容</span>
+          <div>
+            <button id="export-select-all" class="text-button" type="button">
+              全部选择（含空类别）
+            </button>
+            <button id="export-clear-all" class="text-button" type="button">
+              清空选择
+            </button>
+          </div>
+        </div>
+        <div id="export-tree" class="export-tree"></div>
+
+        <div class="export-preview">
+          <span>文件格式预览</span>
+          <code>姓名：张三</code>
+          <code>电话：13800000000</code>
+        </div>
+
+        <div class="modal-actions">
+          <button class="text-button modal-close" type="button">取消</button>
+          <button id="download-text-file" class="primary-button" type="button">
+            下载文件
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="item-dialog" class="modal">
+      <form id="item-form" class="modal-content">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">归档内容</p>
+            <h2>编辑内容</h2>
+          </div>
+          <button
+            class="icon-button modal-close"
+            type="button"
+            aria-label="关闭"
+            title="关闭"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <label class="field">
+          <span>内容</span>
+          <textarea
+            id="item-text-input"
+            rows="7"
+            maxlength="50000"
+            required
+          ></textarea>
+        </label>
+        <p id="item-form-error" class="error-message" role="alert"></p>
+        <div class="modal-actions">
+          <button class="text-button modal-close" type="button">取消</button>
+          <button class="primary-button" type="submit">保存修改</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="modal confirm-modal">
+      <div class="modal-content">
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M10.3 3.7 2.5 17.2A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.8L13.7 3.7a2 2 0 0 0-3.4 0Z" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+          </svg>
+        </div>
+        <h2 id="confirm-title">确认操作</h2>
+        <p id="confirm-message"></p>
+        <div class="modal-actions">
+          <button id="confirm-cancel" class="text-button" type="button">
+            取消
+          </button>
+          <button id="confirm-submit" class="danger-button" type="button">
+            确认删除
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="storage.js"></script>
+    <script src="download-utils.js"></script>
+    <script src="workspace.js"></script>
+  </body>
+</html>

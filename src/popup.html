@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>归类采集工作台</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 7.5h16" />
+              <path d="M6.5 4h11l2.5 3.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-11L6.5 4Z" />
+              <path d="M9 12h6" />
+              <path d="M9 16h4" />
+            </svg>
+          </span>
+          <div>
+            <p class="eyebrow">本地采集归档</p>
+            <h1>归类采集</h1>
+          </div>
+        </div>
+        <button
+          id="open-workspace-icon"
+          class="icon-button"
+          type="button"
+          title="打开工作台"
+          aria-label="打开工作台"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M14 4h6v6" />
+            <path d="m20 4-9 9" />
+            <path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4" />
+          </svg>
+        </button>
+      </header>
+
+      <section class="collection-control" aria-label="采集状态">
+        <span id="collection-status-dot" class="status-dot"></span>
+        <div class="collection-status-copy">
+          <strong id="collection-status-title">采集已启动</strong>
+          <span id="collection-status-description">
+            网页选中文本后可立即归档
+          </span>
+        </div>
+        <div class="status-actions">
+          <button
+            id="drawer-visibility-toggle"
+            class="status-toggle secondary-status-toggle"
+            type="button"
+          >
+            隐藏侧栏
+          </button>
+          <button
+            id="collection-toggle"
+            class="status-toggle"
+            type="button"
+          >
+            停止采集
+          </button>
+        </div>
+      </section>
+
+      <section class="primary-actions" aria-label="主要操作">
+        <button id="new-project-button" class="primary-button" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <span>新建项目</span>
+        </button>
+        <button id="open-workspace-button" class="secondary-button" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Z" />
+            <path d="M8 8h8" />
+            <path d="M8 12h8" />
+            <path d="M8 16h5" />
+          </svg>
+          <span>打开工作台</span>
+        </button>
+      </section>
+
+      <section class="recent-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">快速继续</p>
+            <h2>最近项目</h2>
+          </div>
+          <span id="project-count" class="count-badge">0 个</span>
+        </div>
+        <div id="recent-projects" class="recent-list" aria-live="polite"></div>
+      </section>
+
+      <footer class="popup-footer">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3 5 6v5c0 4.6 2.9 8.4 7 10 4.1-1.6 7-5.4 7-10V6l-7-3Z" />
+          <path d="m9.5 12 1.7 1.7 3.6-4" />
+        </svg>
+        <span>所有采集内容仅保存在本机浏览器中 · 作者 Eoszeph</span>
+      </footer>
+    </main>
+
+    <dialog id="create-dialog" class="modal">
+      <form id="create-project-form" class="modal-content">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">创建采集空间</p>
+            <h2>新建项目</h2>
+          </div>
+          <button
+            id="close-create-dialog"
+            class="icon-button"
+            type="button"
+            aria-label="关闭"
+            title="关闭"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <label class="field">
+          <span>项目名称</span>
+          <input
+            id="project-name"
+            name="projectName"
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+            required
+          />
+        </label>
+        <p id="name-hint" class="field-hint">
+          已尝试读取当前浏览器账号或系统平台，可手动修改。
+        </p>
+
+        <div class="preset-preview">
+          <p>预设类别（点击选择）</p>
+          <div id="preset-categories" class="preset-list"></div>
+        </div>
+
+        <div class="custom-category-builder">
+          <div class="builder-heading">
+            <div>
+              <p>个性化定制类别</p>
+              <span>添加项目中需要使用的自定义类别</span>
+            </div>
+          </div>
+          <div class="custom-category-input">
+            <input
+              id="custom-category-name"
+              type="text"
+              maxlength="40"
+              placeholder="例如：客户等级"
+              autocomplete="off"
+            />
+            <button id="add-custom-category" type="button">添加</button>
+          </div>
+          <div id="custom-category-list" class="custom-category-list"></div>
+        </div>
+
+        <p id="create-error" class="error-message" role="alert"></p>
+
+        <div class="modal-actions">
+          <button id="cancel-create" class="text-button" type="button">
+            取消
+          </button>
+          <button id="confirm-create" class="primary-button" type="submit">
+            <span>创建并打开</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="storage.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
