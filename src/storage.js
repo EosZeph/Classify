@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "archiveState";
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
 
   const CATEGORY_TEMPLATES = [
     {
@@ -111,16 +111,91 @@
     }));
   }
 
-  function createProject(name, categoryDefinitions) {
+  function createEmptyGroup(name, index) {
+    const timestamp = nowIso();
+    return {
+      id: createId("group"),
+      name: cleanText(name, 40) || `第 ${index + 1} 组`,
+      values: {},
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+  }
+
+  function normalizeGroupValue(value) {
+    if (typeof value === "string") {
+      const text = cleanText(value, 50000);
+      return text
+        ? {
+            id: createId("group_value"),
+            text,
+            sourceTitle: "",
+            sourceUrl: "",
+            capturedAt: nowIso(),
+            updatedAt: nowIso()
+          }
+        : null;
+    }
+
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const text = cleanText(value.text, 50000);
+    if (!text) {
+      return null;
+    }
+
+    return {
+      id: cleanText(value.id, 120) || createId("group_value"),
+      text,
+      sourceTitle: cleanText(value.sourceTitle, 300),
+      sourceUrl: cleanText(value.sourceUrl, 2000),
+      capturedAt: cleanText(value.capturedAt, 80) || nowIso(),
+      updatedAt: cleanText(value.updatedAt, 80) || nowIso()
+    };
+  }
+
+  function normalizeGroup(group, index) {
+    if (!group || typeof group !== "object") {
+      return null;
+    }
+
+    const timestamp = nowIso();
+    const values = {};
+    if (group.values && typeof group.values === "object") {
+      Object.entries(group.values).forEach(([categoryId, value]) => {
+        const normalizedValue = normalizeGroupValue(value);
+        if (normalizedValue) {
+          values[categoryId] = normalizedValue;
+        }
+      });
+    }
+
+    return {
+      id: cleanText(group.id, 120) || createId("group"),
+      name: cleanText(group.name, 40) || `第 ${index + 1} 组`,
+      values,
+      createdAt: cleanText(group.createdAt, 80) || timestamp,
+      updatedAt: cleanText(group.updatedAt, 80) || timestamp
+    };
+  }
+
+  function createProject(name, categoryDefinitions, mode = "single") {
     const timestamp = nowIso();
     const safeName = cleanText(name, 80) || "未命名项目";
+    const safeMode = mode === "multi" ? "multi" : "single";
+    const groups = safeMode === "multi" ? [createEmptyGroup("", 0)] : [];
 
     return {
       id: createId("project"),
       name: safeName,
+      mode: safeMode,
       createdAt: timestamp,
       updatedAt: timestamp,
-      categories: createDefaultCategories(categoryDefinitions)
+      categories: createDefaultCategories(categoryDefinitions),
+      groups,
+      activeGroupId: groups[0]?.id || null
     };
   }
 
@@ -191,13 +266,25 @@
           .filter(Boolean)
           .sort((left, right) => left.position - right.position)
       : createDefaultCategories();
+    const mode = project.mode === "multi" ? "multi" : "single";
+    const groups = Array.isArray(project.groups)
+      ? project.groups.map(normalizeGroup).filter(Boolean)
+      : [];
+    const activeGroupId = groups.some(
+      (group) => group.id === project.activeGroupId
+    )
+      ? project.activeGroupId
+      : groups[0]?.id || null;
 
     return {
       id: cleanText(project.id, 120) || createId("project"),
       name,
+      mode,
       createdAt: cleanText(project.createdAt, 80) || timestamp,
       updatedAt: cleanText(project.updatedAt, 80) || timestamp,
-      categories
+      categories,
+      groups,
+      activeGroupId
     };
   }
 
@@ -355,6 +442,7 @@
     cleanText,
     clone,
     createDefaultCategories,
+    createEmptyGroup,
     createId,
     createProject,
     cleanLegacyState,

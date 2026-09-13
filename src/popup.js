@@ -24,6 +24,9 @@ const addCustomCategoryButton = document.querySelector(
   "#add-custom-category"
 );
 const customCategoryList = document.querySelector("#custom-category-list");
+const popupProjectModeInputs = document.querySelectorAll(
+  'input[name="popup-project-mode"]'
+);
 const openWorkspaceButton = document.querySelector("#open-workspace-button");
 const openWorkspaceIcon = document.querySelector("#open-workspace-icon");
 const newProjectButton = document.querySelector("#new-project-button");
@@ -51,10 +54,16 @@ function sendMessage(type, payload = {}) {
 }
 
 function formatProjectMeta(project) {
-  const count = project.categories.reduce(
-    (total, category) => total + category.items.length,
-    0
-  );
+  const count =
+    project.mode === "multi"
+      ? project.groups.reduce(
+          (total, group) => total + Object.keys(group.values || {}).length,
+          0
+        )
+      : project.categories.reduce(
+          (total, category) => total + category.items.length,
+          0
+        );
   const date = new Date(project.updatedAt);
   const formatted = Number.isNaN(date.getTime())
     ? "刚刚"
@@ -63,7 +72,9 @@ function formatProjectMeta(project) {
         day: "numeric"
       }).format(date);
 
-  return `${count} 条内容 · ${formatted} 更新`;
+  return `${
+    project.mode === "multi" ? "多组" : "单组"
+  } · ${count} 项内容 · ${formatted} 更新`;
 }
 
 function renderPresetCategories() {
@@ -300,6 +311,9 @@ function openCreateDialog() {
     .forEach((checkbox) => {
       checkbox.checked = true;
     });
+  popupProjectModeInputs.forEach((input) => {
+    input.checked = input.value === "single";
+  });
   renderCustomCategories();
   if (!createDialog.open) {
     createDialog.showModal();
@@ -458,6 +472,9 @@ createForm.addEventListener("submit", async (event) => {
     }
     const response = await sendMessage("CREATE_PROJECT", {
       name,
+      mode:
+        Array.from(popupProjectModeInputs).find((input) => input.checked)
+          ?.value || "single",
       categories
     });
     await openWorkspace(response.result.id);

@@ -136,8 +136,20 @@
           />
         </label>
         <p id="name-hint" class="field-hint">
-          已尝试读取当前浏览器账号或系统平台，可手动修改。
+          默认使用当前系统时间，可手动修改。
         </p>
+
+        <fieldset class="popup-mode-field">
+          <legend>项目模式</legend>
+          <label>
+            <input type="radio" name="popup-project-mode" value="single" checked />
+            <span><strong>单组</strong><small>同一类别可采集多条内容</small></span>
+          </label>
+          <label>
+            <input type="radio" name="popup-project-mode" value="multi" />
+            <span><strong>多组</strong><small>多个同类别数据组，按组下载</small></span>
+          </label>
+        </fieldset>
 
         <div class="preset-preview">
           <p>预设类别（点击选择）</p>

@@ -32,6 +32,7 @@ const emptyNewProject = document.querySelector("#empty-new-project");
 const renameProjectButton = document.querySelector("#rename-project");
 const deleteProjectButton = document.querySelector("#delete-project");
 const addCategoryButton = document.querySelector("#add-category");
+const addGroupButton = document.querySelector("#add-group");
 const exportTextButton = document.querySelector("#export-text");
 const exportCsvButton = document.querySelector("#export-csv");
 const workspaceCollectionToggle = document.querySelector(
@@ -48,6 +49,9 @@ const projectDialog = document.querySelector("#project-dialog");
 const projectForm = document.querySelector("#project-form");
 const projectDialogTitle = document.querySelector("#project-dialog-title");
 const projectNameInput = document.querySelector("#project-name-input");
+const projectModeInputs = document.querySelectorAll(
+  'input[name="project-mode"]'
+);
 const projectFormError = document.querySelector("#project-form-error");
 const projectSubmit = document.querySelector("#project-submit");
 const projectCategoryBuilder = document.querySelector(
@@ -160,6 +164,12 @@ function getCurrentProject() {
 }
 
 function getProjectEntryCount(project) {
+  if (project.mode === "multi") {
+    return project.groups.reduce(
+      (total, group) => total + Object.keys(group.values || {}).length,
+      0
+    );
+  }
   return project.categories.reduce(
     (total, category) => total + category.items.length,
     0
@@ -221,6 +231,7 @@ function setWorkspaceEnabled(enabled) {
   renameProjectButton.disabled = !enabled;
   deleteProjectButton.disabled = !enabled;
   addCategoryButton.disabled = !enabled;
+  addGroupButton.disabled = !enabled;
   exportTextButton.disabled = !enabled;
   exportCsvButton.disabled = !enabled;
   searchInput.disabled = !enabled;
@@ -290,15 +301,19 @@ function renderProjectHeader(project) {
     categoryCount.textContent = "0";
     itemCount.textContent = "0";
     updatedAt.textContent = "--";
+    addGroupButton.hidden = true;
     setWorkspaceEnabled(false);
     return;
   }
 
   projectTitle.textContent = project.name;
-  projectMeta.textContent = `创建于 ${formatFullTime(project.createdAt)}`;
+  projectMeta.textContent = `${
+    project.mode === "multi" ? "多组项目" : "单组项目"
+  } · 创建于 ${formatFullTime(project.createdAt)}`;
   categoryCount.textContent = String(project.categories.length);
   itemCount.textContent = String(getProjectEntryCount(project));
   updatedAt.textContent = formatRelativeTime(project.updatedAt);
+  addGroupButton.hidden = project.mode !== "multi";
   setWorkspaceEnabled(true);
 }
 
@@ -508,6 +523,15 @@ function renderEmptyWorkspace(project, hasSearchResults) {
     return;
   }
 
+  if (project.mode === "multi") {
+    emptyTitle.textContent = "还没有分组";
+    emptyDescription.textContent =
+      "新增一个分组后，即可按同一套类别填写多组数据。";
+    emptyNewProject.hidden = false;
+    emptyNewProject.querySelector("span").textContent = "新增分组";
+    return;
+  }
+
   if (hasSearchResults) {
     return;
   }
@@ -525,10 +549,138 @@ function renderEmptyWorkspace(project, hasSearchResults) {
   emptyNewProject.querySelector("span").textContent = "新增类别";
 }
 
+function renderGroupCard(project, group, query) {
+  const normalizedQuery = query.toLocaleLowerCase("zh-CN");
+  const visibleCategories = project.categories.filter((category) => {
+    if (!query) {
+      return true;
+    }
+    const value = group.values[category.id]?.text || "";
+    return (
+      category.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery) ||
+      value.toLocaleLowerCase("zh-CN").includes(normalizedQuery)
+    );
+  });
+
+  if (query && !visibleCategories.length) {
+    return "";
+  }
+
+  const fields = visibleCategories
+    .map((category) => {
+      const rawValue = group.values[category.id]?.text || "";
+      const value = rawValue.replace(/\s+/g, " ").trim();
+      return `
+        <div
+          class="group-field"
+          data-category-id="${escapeHtml(category.id)}"
+        >
+          <span class="group-field-label">
+            <span
+              class="group-field-dot"
+              style="background: ${escapeHtml(category.color)}"
+            ></span>
+            <span title="${escapeHtml(category.name)}">
+              ${escapeHtml(category.name)}
+            </span>
+          </span>
+          <input
+            type="text"
+            maxlength="50000"
+            value="${escapeHtml(value)}"
+            data-group-value
+            data-group-id="${escapeHtml(group.id)}"
+            data-category-id="${escapeHtml(category.id)}"
+            placeholder="输入${escapeHtml(category.name)}"
+          />
+          <button
+            class="group-field-clear"
+            type="button"
+            data-action="clear-group-value"
+            data-group-id="${escapeHtml(group.id)}"
+            data-category-id="${escapeHtml(category.id)}"
+            title="清除该值"
+            aria-label="清除该值"
+            ${value ? "" : "disabled"}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12"></path>
+              <path d="M18 6 6 18"></path>
+            </svg>
+          </button>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <article
+      class="group-card"
+      data-group-id="${escapeHtml(group.id)}"
+      data-active="${String(project.activeGroupId === group.id)}"
+    >
+      <header class="group-header">
+        <div class="group-name-wrap">
+          <input
+            class="group-name-input"
+            type="text"
+            maxlength="40"
+            value="${escapeHtml(group.name)}"
+            data-group-name
+            data-group-id="${escapeHtml(group.id)}"
+            aria-label="分组名称"
+          />
+        </div>
+        <div class="group-header-actions">
+          <button
+            class="group-active-button"
+            type="button"
+            data-action="set-active-group"
+            data-group-id="${escapeHtml(group.id)}"
+            data-active="${String(project.activeGroupId === group.id)}"
+          >
+            ${project.activeGroupId === group.id ? "当前采集组" : "设为采集组"}
+          </button>
+          <button
+            class="icon-button danger-icon"
+            type="button"
+            data-action="delete-group"
+            data-group-id="${escapeHtml(group.id)}"
+            title="删除分组"
+            aria-label="删除分组"
+            ${project.groups.length === 1 ? "disabled" : ""}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 6h18"></path>
+              <path d="M8 6V4h8v2"></path>
+              <path d="m19 6-1 14H6L5 6"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div class="group-fields">${fields}</div>
+    </article>
+  `;
+}
+
+function renderGroups(project) {
+  const query = searchInput.value.trim();
+  const groupMarkup = project.groups
+    .map((group) => renderGroupCard(project, group, query))
+    .filter(Boolean);
+  categoryGrid.innerHTML = groupMarkup.join("");
+  renderEmptyWorkspace(project, groupMarkup.length > 0);
+}
+
 function renderCategories(project) {
   if (!project) {
     categoryGrid.replaceChildren();
     renderEmptyWorkspace(null, false);
+    return;
+  }
+
+  if (project.mode === "multi") {
+    renderGroups(project);
     return;
   }
 
@@ -759,10 +911,20 @@ function getSelectedProjectCategories() {
   ];
 }
 
+function getSelectedProjectMode() {
+  return (
+    Array.from(projectModeInputs).find((input) => input.checked)?.value ||
+    "single"
+  );
+}
+
 function openProjectDialog(mode = "create", project = null) {
   projectDialogMode = mode;
   projectFormError.textContent = "";
   projectNameInput.value = project?.name || createSystemTimeName();
+  projectModeInputs.forEach((input) => {
+    input.checked = input.value === (project?.mode || "single");
+  });
   projectCategoryBuilder.hidden = mode === "edit";
   projectCustomCategories = [];
   projectCustomCategoryName.value = "";
@@ -917,6 +1079,11 @@ function renderExportTree() {
     (candidate) => candidate.id === exportProjectSelect.value
   );
 
+  if (project?.mode === "multi") {
+    renderMultiExportTree(project);
+    return;
+  }
+
   if (!project || !project.categories.length) {
     exportTree.innerHTML =
       '<p class="export-empty">当前项目还没有可下载的类别。</p>';
@@ -975,7 +1142,78 @@ function renderExportTree() {
   updateExportSelectionState();
 }
 
+function renderMultiExportTree(project) {
+  if (!project.groups.length) {
+    exportTree.innerHTML =
+      '<p class="export-empty">当前多组项目还没有分组。</p>';
+    updateExportSelectionState();
+    return;
+  }
+
+  exportTree.innerHTML = project.groups
+    .map((group, groupIndex) => {
+      const fields = project.categories
+        .map((category) => {
+          const value = group.values[category.id]?.text || "";
+          if (!value) {
+            return "";
+          }
+          return `
+            <div class="export-item export-group-value">
+              <span class="export-category-dot" style="background:${escapeHtml(
+                category.color
+              )}"></span>
+              <span><strong>${escapeHtml(category.name)}：</strong>${escapeHtml(
+                value
+              )}</span>
+            </div>
+          `;
+        })
+        .filter(Boolean)
+        .join("");
+
+      return `
+        <section
+          class="export-category-group"
+          data-export-group="${escapeHtml(group.id)}"
+        >
+          <label class="export-category-header">
+            <input
+              type="checkbox"
+              data-export-group-check="${escapeHtml(group.id)}"
+              checked
+            />
+            <span class="export-category-name">
+              ${escapeHtml(group.name || `第 ${groupIndex + 1} 组`)}
+            </span>
+            <span class="export-category-total">
+              ${Object.keys(group.values).length} 项
+            </span>
+          </label>
+          <div class="export-items">
+            ${fields || '<p class="export-empty">该分组暂无内容</p>'}
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+
+  updateExportSelectionState();
+}
+
 function updateExportSelectionState() {
+  const project = state.projects.find(
+    (candidate) => candidate.id === exportProjectSelect.value
+  );
+  if (project?.mode === "multi") {
+    const selectedGroups = exportTree.querySelectorAll(
+      "input[data-export-group-check]:checked"
+    ).length;
+    exportSelectionCount.textContent = `已选择 ${selectedGroups} 个分组`;
+    downloadTextFileButton.disabled = selectedGroups === 0;
+    return;
+  }
+
   exportTree
     .querySelectorAll(".export-category-group")
     .forEach((group) => {
@@ -1059,7 +1297,33 @@ function buildSelectedRows(project) {
   return rows;
 }
 
+function buildMultiExportLines(project) {
+  const selectedGroups = project.groups.filter((group) => {
+    const checkbox = exportTree.querySelector(
+      `input[data-export-group-check="${CSS.escape(group.id)}"]`
+    );
+    return checkbox?.checked;
+  });
+
+  return selectedGroups.map((group, index) => {
+    const parts = project.categories
+      .map((category) => {
+        const text = group.values[category.id]?.text
+          ?.replace(/\s+/g, " ")
+          .trim();
+        return text ? `${category.name}：${text}` : "";
+      })
+      .filter(Boolean);
+    const ending = index === selectedGroups.length - 1 ? "。" : "；";
+    return `${parts.join("，")}${ending}`;
+  });
+}
+
 function buildSelectedText(project) {
+  if (project.mode === "multi") {
+    return buildMultiExportLines(project).join("\r\n");
+  }
+
   return buildSelectedRows(project)
     .map((row) => `${row.category}：${row.text}`)
     .join("\r\n");
@@ -1113,7 +1377,10 @@ sidebarNewProject.addEventListener("click", () =>
 );
 
 emptyNewProject.addEventListener("click", () => {
-  if (getCurrentProject()) {
+  const project = getCurrentProject();
+  if (project?.mode === "multi") {
+    createProjectGroup(project);
+  } else if (project) {
     openCategoryDialog();
   } else {
     openProjectDialog("create");
@@ -1149,7 +1416,26 @@ renameProjectButton.addEventListener("click", () => {
   }
 });
 
+async function createProjectGroup(project) {
+  try {
+    const response = await sendMessage("ADD_GROUP", {
+      projectId: project.id
+    });
+    state = response.state;
+    render();
+    showToast("已新增分组。");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
 addCategoryButton.addEventListener("click", () => openCategoryDialog());
+addGroupButton.addEventListener("click", () => {
+  const project = getCurrentProject();
+  if (project?.mode === "multi") {
+    createProjectGroup(project);
+  }
+});
 workspaceCollectionToggle.addEventListener("click", async () => {
   const enabled = state?.collectionEnabled === false;
   workspaceCollectionToggle.disabled = true;
@@ -1313,8 +1599,10 @@ downloadTextFileButton.addEventListener("click", () => {
     return;
   }
 
-  const rows = buildSelectedRows(project);
-  if (!rows.length) {
+  const isMulti = project.mode === "multi";
+  const rows = isMulti ? [] : buildSelectedRows(project);
+  const multiLines = isMulti ? buildMultiExportLines(project) : [];
+  if ((!isMulti && !rows.length) || (isMulti && !multiLines.length)) {
     showToast("请至少选择一个类别或内容。", "error");
     return;
   }
@@ -1322,7 +1610,9 @@ downloadTextFileButton.addEventListener("click", () => {
   const now = createSystemTimeName().replaceAll(":", "-");
   const baseFilename = `${sanitizeFilename(project.name)}-${now}`;
   if (exportFileFormat.value === "docx") {
-    const blob = ArchiveDownload.createDocxBlob(project.name, rows);
+    const blob = isMulti
+      ? ArchiveDownload.createDocxLinesBlob(project.name, multiLines)
+      : ArchiveDownload.createDocxBlob(project.name, rows);
     ArchiveDownload.triggerDownload(blob, `${baseFilename}.docx`);
     showToast("Word 文档已下载。");
   } else {
@@ -1358,7 +1648,8 @@ projectForm.addEventListener("submit", async (event) => {
     if (projectDialogMode === "edit" && project) {
       response = await sendMessage("UPDATE_PROJECT", {
         projectId: project.id,
-        name
+        name,
+        mode: getSelectedProjectMode()
       });
     } else {
       const categories = getSelectedProjectCategories();
@@ -1367,6 +1658,7 @@ projectForm.addEventListener("submit", async (event) => {
       }
       response = await sendMessage("CREATE_PROJECT", {
         name,
+        mode: getSelectedProjectMode(),
         categories
       });
     }
@@ -1445,6 +1737,111 @@ categoryForm.addEventListener("submit", async (event) => {
     categoryFormError.textContent = error.message;
   } finally {
     submitButton.disabled = false;
+  }
+});
+
+categoryGrid.addEventListener("change", async (event) => {
+  const project = getCurrentProject();
+  if (!project || project.mode !== "multi") {
+    return;
+  }
+
+  const valueInput = event.target.closest("input[data-group-value]");
+  if (valueInput) {
+    try {
+      const response = await sendMessage("UPDATE_GROUP_VALUE", {
+        projectId: project.id,
+        groupId: valueInput.dataset.groupId,
+        categoryId: valueInput.dataset.categoryId,
+        text: valueInput.value
+      });
+      state = response.state;
+      render();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  const nameInput = event.target.closest("input[data-group-name]");
+  if (nameInput) {
+    try {
+      const response = await sendMessage("UPDATE_GROUP", {
+        projectId: project.id,
+        groupId: nameInput.dataset.groupId,
+        name: nameInput.value
+      });
+      state = response.state;
+      render();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+});
+
+categoryGrid.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-action]");
+  const groupCard = button?.closest(".group-card");
+  const project = getCurrentProject();
+  if (!button || !groupCard || !project || project.mode !== "multi") {
+    return;
+  }
+
+  const action = button.dataset.action;
+  const groupId = button.dataset.groupId;
+  if (action === "set-active-group") {
+    try {
+      const response = await sendMessage("SET_ACTIVE_GROUP", {
+        projectId: project.id,
+        groupId
+      });
+      state = response.state;
+      render();
+      showToast("当前采集组已切换。");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  if (action === "clear-group-value") {
+    try {
+      const response = await sendMessage("UPDATE_GROUP_VALUE", {
+        projectId: project.id,
+        groupId,
+        categoryId: button.dataset.categoryId,
+        text: ""
+      });
+      state = response.state;
+      render();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  if (action === "delete-group") {
+    const group = project.groups.find((candidate) => candidate.id === groupId);
+    const shouldDelete = await askConfirm({
+      title: "删除这个分组？",
+      message: `“${group?.name || "当前分组"}”中的全部类别值都会被删除。`,
+      confirmLabel: "删除分组"
+    });
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      const response = await sendMessage("DELETE_GROUP", {
+        projectId: project.id,
+        groupId
+      });
+      state = response.state;
+      render();
+      showToast("分组已删除。");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
   }
 });
 

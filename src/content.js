@@ -370,6 +370,10 @@
         font-size: 11px;
       }
 
+      .drawer-group-wrap {
+        margin-top: 8px;
+      }
+
       .drawer-stats {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -1012,6 +1016,10 @@
       <div class="drawer-project">
         <label for="drawer-project-select">目标项目</label>
         <select id="drawer-project-select"></select>
+        <div id="drawer-group-wrap" class="drawer-group-wrap" hidden>
+          <label for="drawer-group-select">当前采集组</label>
+          <select id="drawer-group-select"></select>
+        </div>
       </div>
 
       <div class="drawer-stats">
@@ -1065,6 +1073,8 @@
   const drawerProjectSelect = shadow.querySelector(
     "#drawer-project-select"
   );
+  const drawerGroupWrap = shadow.querySelector("#drawer-group-wrap");
+  const drawerGroupSelect = shadow.querySelector("#drawer-group-select");
   const drawerStatus = shadow.querySelector("#drawer-status");
   const drawerStatusTitle = shadow.querySelector("#drawer-status-title");
   const drawerStatusDescription = shadow.querySelector(
@@ -1160,9 +1170,27 @@
   }
 
   function buildProjectText(project) {
+    if (project.mode === "multi") {
+      return buildProjectMultiLines(project).join("\r\n");
+    }
     return buildProjectRows(project)
       .map((row) => `${row.category}：${row.text}`)
       .join("\r\n");
+  }
+
+  function buildProjectMultiLines(project) {
+    return project.groups.map((group, index) => {
+      const parts = project.categories
+        .map((category) => {
+          const text = group.values[category.id]?.text
+            ?.replace(/\s+/g, " ")
+            .trim();
+          return text ? `${category.name}：${text}` : "";
+        })
+        .filter(Boolean);
+      const ending = index === project.groups.length - 1 ? "。" : "；";
+      return `${parts.join("，")}${ending}`;
+    });
   }
 
   function downloadProjectText(project) {
@@ -1181,8 +1209,16 @@
   }
 
   function downloadProjectDocx(project) {
-    const rows = buildProjectRows(project);
-    const blob = ArchiveDownload.createDocxBlob(project.name, rows);
+    const blob =
+      project.mode === "multi"
+        ? ArchiveDownload.createDocxLinesBlob(
+            project.name,
+            buildProjectMultiLines(project)
+          )
+        : ArchiveDownload.createDocxBlob(
+            project.name,
+            buildProjectRows(project)
+          );
     ArchiveDownload.triggerDownload(
       blob,
       `${ArchiveDownload.sanitizeFilename(project.name)}.docx`
@@ -1343,6 +1379,25 @@
     drawerProjectSelect.disabled = false;
   }
 
+  function renderDrawerGroupSelect(project) {
+    drawerGroupSelect.replaceChildren();
+    const isMulti = project?.mode === "multi";
+    drawerGroupWrap.hidden = !isMulti;
+    if (!isMulti) {
+      drawerGroupSelect.disabled = true;
+      return;
+    }
+
+    project.groups.forEach((group, index) => {
+      const option = document.createElement("option");
+      option.value = group.id;
+      option.textContent = group.name || `第 ${index + 1} 组`;
+      option.selected = group.id === project.activeGroupId;
+      drawerGroupSelect.append(option);
+    });
+    drawerGroupSelect.disabled = !project.groups.length;
+  }
+
   function renderDrawerCategories(project) {
     drawerCategoryList.replaceChildren();
 
@@ -1354,10 +1409,24 @@
       return;
     }
 
+    const activeGroup =
+      project.mode === "multi"
+        ? project.groups.find(
+            (group) => group.id === project.activeGroupId
+          ) || project.groups[0]
+        : null;
+
     project.categories.forEach((category) => {
+      const groupValue = activeGroup?.values[category.id];
+      const categoryItems =
+        project.mode === "multi"
+          ? groupValue
+            ? [groupValue]
+            : []
+          : category.items;
       if (!initializedCategoryIds.has(category.id)) {
         initializedCategoryIds.add(category.id);
-        if (category.items.length > 0) {
+        if (categoryItems.length > 0) {
           expandedCategoryIds.add(category.id);
         }
       }
@@ -1387,7 +1456,12 @@
 
       const count = document.createElement("span");
       count.className = "drawer-category-count";
-      count.textContent = `${category.items.length} 条`;
+      count.textContent =
+        project.mode === "multi"
+          ? groupValue
+            ? "已填写"
+            : "未填写"
+          : `${category.items.length} 条`;
 
       const chevron = document.createElement("span");
       chevron.className = "drawer-category-chevron";
@@ -1401,7 +1475,7 @@
       itemList.className = "drawer-category-items";
       itemList.hidden = !expanded;
 
-      const previewItems = category.items.slice(0, 5);
+      const previewItems = categoryItems.slice(0, 5);
       if (!previewItems.length) {
         const empty = document.createElement("p");
         empty.className = "drawer-empty";
@@ -1445,11 +1519,11 @@
           itemList.append(row);
         });
 
-        if (category.items.length > previewItems.length) {
+        if (categoryItems.length > previewItems.length) {
           const more = document.createElement("div");
           more.className = "drawer-more";
           more.textContent = `另有 ${
-            category.items.length - previewItems.length
+            categoryItems.length - previewItems.length
           } 条内容`;
           itemList.append(more);
         }
@@ -1473,6 +1547,7 @@
 
     drawerProjectName.textContent = project?.name || "暂无项目";
     renderDrawerProjectSelect();
+    renderDrawerGroupSelect(project);
 
     drawerStatus.dataset.enabled = String(enabled);
     drawerStatusTitle.textContent = enabled ? "采集已启动" : "采集已停止";
@@ -1487,15 +1562,21 @@
     );
     drawerItemTotal.textContent = String(
       project
-        ? project.categories.reduce(
-            (total, category) => total + category.items.length,
-            0
-          )
+        ? project.mode === "multi"
+          ? project.groups.reduce(
+              (total, group) => total + Object.keys(group.values).length,
+              0
+            )
+          : project.categories.reduce(
+              (total, category) => total + category.items.length,
+              0
+            )
         : 0
     );
 
     renderDrawerCategories(project);
-    drawerDownloadButton.disabled = !project;
+    drawerDownloadButton.disabled =
+      !project || (project.mode === "multi" && !project.groups.length);
   }
 
   async function refreshState() {
@@ -1644,6 +1725,8 @@
         text: pendingSelection.text,
         sourceTitle: document.title,
         sourceUrl: window.location.href,
+        groupId:
+          project.mode === "multi" ? project.activeGroupId : undefined,
         captureMode: true
       });
       currentState = response.state;
@@ -1770,6 +1853,28 @@
       if (!panel.hidden) {
         renderPanel();
       }
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      busy = false;
+      renderDrawer();
+    }
+  });
+
+  drawerGroupSelect.addEventListener("change", async () => {
+    const project = getActiveProject();
+    if (!project || project.mode !== "multi" || busy) {
+      return;
+    }
+
+    busy = true;
+    try {
+      const response = await sendMessage("SET_ACTIVE_GROUP", {
+        projectId: project.id,
+        groupId: drawerGroupSelect.value
+      });
+      currentState = response.state;
+      renderDrawer();
     } catch (error) {
       showToast(error.message, "error");
     } finally {

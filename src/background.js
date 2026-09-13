@@ -79,7 +79,8 @@ async function handleMessage(message, sender) {
       return enqueueMutation((state) => {
         const project = ArchiveStore.createProject(
           payload.name,
-          payload.categories
+          payload.categories,
+          payload.mode
         );
         state.projects.push(project);
         state.activeProjectId = project.id;
@@ -100,8 +101,144 @@ async function handleMessage(message, sender) {
         const project = requireProject(state, payload.projectId);
         project.name =
           ArchiveStore.cleanText(payload.name, 80) || project.name;
+        if (payload.mode === "multi" || payload.mode === "single") {
+          project.mode = payload.mode;
+          if (project.mode === "multi" && !project.groups.length) {
+            const group = ArchiveStore.createEmptyGroup("", 0);
+            project.groups.push(group);
+            project.activeGroupId = group.id;
+          }
+          if (project.mode === "multi" && !project.activeGroupId) {
+            project.activeGroupId = project.groups[0]?.id || null;
+          }
+          if (project.mode === "single") {
+            project.activeGroupId = project.groups[0]?.id || null;
+          }
+        }
         ArchiveStore.touchProject(project);
         return project;
+      });
+    }
+
+    case "ADD_GROUP": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const group = ArchiveStore.createEmptyGroup(
+          "",
+          project.groups.length
+        );
+        project.groups.push(group);
+        project.activeGroupId = group.id;
+        ArchiveStore.touchProject(project);
+        return group;
+      });
+    }
+
+    case "DELETE_GROUP": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const index = project.groups.findIndex(
+          (group) => group.id === payload.groupId
+        );
+        if (index === -1) {
+          throw new Error("分组不存在或已被删除。");
+        }
+        if (project.groups.length === 1) {
+          throw new Error("多组项目至少需要保留一个分组。");
+        }
+
+        project.groups.splice(index, 1);
+        if (project.activeGroupId === payload.groupId) {
+          project.activeGroupId = project.groups[0]?.id || null;
+        }
+        ArchiveStore.touchProject(project);
+        return true;
+      });
+    }
+
+    case "UPDATE_GROUP": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const group = project.groups.find(
+          (candidate) => candidate.id === payload.groupId
+        );
+        if (!group) {
+          throw new Error("分组不存在或已被删除。");
+        }
+        group.name =
+          ArchiveStore.cleanText(payload.name, 40) || group.name;
+        group.updatedAt = ArchiveStore.nowIso();
+        ArchiveStore.touchProject(project);
+        return group;
+      });
+    }
+
+    case "SET_ACTIVE_GROUP": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const group = project.groups.find(
+          (candidate) => candidate.id === payload.groupId
+        );
+        if (!group) {
+          throw new Error("分组不存在或已被删除。");
+        }
+        project.activeGroupId = group.id;
+        ArchiveStore.touchProject(project);
+        return group;
+      });
+    }
+
+    case "UPDATE_GROUP_VALUE": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const category = requireCategory(project, payload.categoryId);
+        const group = project.groups.find(
+          (candidate) => candidate.id === payload.groupId
+        );
+        if (!group) {
+          throw new Error("分组不存在或已被删除。");
+        }
+
+        const text = ArchiveStore.cleanText(payload.text, 50000);
+        if (!text) {
+          delete group.values[category.id];
+        } else {
+          const timestamp = ArchiveStore.nowIso();
+          const previous = group.values[category.id];
+          group.values[category.id] = {
+            id: previous?.id || ArchiveStore.createId("group_value"),
+            text,
+            sourceTitle:
+              ArchiveStore.cleanText(payload.sourceTitle, 300) ||
+              previous?.sourceTitle ||
+              "手动录入",
+            sourceUrl:
+              ArchiveStore.cleanText(payload.sourceUrl, 2000) ||
+              previous?.sourceUrl ||
+              "",
+            capturedAt: previous?.capturedAt || timestamp,
+            updatedAt: timestamp
+          };
+        }
+        group.updatedAt = ArchiveStore.nowIso();
+        ArchiveStore.touchProject(project);
+        return group;
+      });
+    }
+
+    case "DELETE_GROUP_VALUE": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const group = project.groups.find(
+          (candidate) => candidate.id === payload.groupId
+        );
+        if (!group) {
+          throw new Error("分组不存在或已被删除。");
+        }
+        delete group.values[payload.categoryId];
+        group.updatedAt = ArchiveStore.nowIso();
+        ArchiveStore.touchProject(project);
+        return true;
       });
     }
 
@@ -227,6 +364,9 @@ async function handleMessage(message, sender) {
         project.categories.forEach((category, position) => {
           category.position = position;
         });
+        project.groups.forEach((group) => {
+          delete group.values[payload.categoryId];
+        });
         ArchiveStore.touchProject(project);
         return true;
       });
@@ -259,6 +399,24 @@ async function handleMessage(message, sender) {
           capturedAt: timestamp,
           updatedAt: timestamp
         };
+
+        if (project.mode === "multi") {
+          const group =
+            project.groups.find(
+              (candidate) => candidate.id === payload.groupId
+            ) ||
+            project.groups.find(
+              (candidate) => candidate.id === project.activeGroupId
+            );
+          if (!group) {
+            throw new Error("请先创建或选择一个分组。");
+          }
+          group.values[category.id] = item;
+          group.updatedAt = timestamp;
+          project.activeGroupId = group.id;
+          ArchiveStore.touchProject(project);
+          return item;
+        }
 
         category.items.unshift(item);
         category.updatedAt = timestamp;

@@ -129,6 +129,18 @@
               <span>新增类别</span>
             </button>
             <button
+              id="add-group"
+              class="secondary-button"
+              type="button"
+              hidden
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>新增分组</span>
+            </button>
+            <button
               id="delete-project"
               class="icon-button danger-icon"
               type="button"
@@ -230,6 +242,23 @@
             required
           />
         </label>
+        <fieldset class="project-mode-field">
+          <legend>项目模式</legend>
+          <label class="project-mode-option">
+            <input type="radio" name="project-mode" value="single" checked />
+            <span>
+              <strong>单组</strong>
+              <small>同一类别可采集多条内容，保持现有下载方式</small>
+            </span>
+          </label>
+          <label class="project-mode-option">
+            <input type="radio" name="project-mode" value="multi" />
+            <span>
+              <strong>多组</strong>
+              <small>手动增加多个同类别的数据组，按组导出</small>
+            </span>
+          </label>
+        </fieldset>
         <section id="project-category-builder" class="project-category-builder">
           <div class="builder-title-row">
             <div>
