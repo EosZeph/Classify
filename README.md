@@ -124,4 +124,4 @@ src/
   workspace.js    项目、类别、条目和导出逻辑
 ```
 请我喝杯Coffee，扫描有彩蛋。
-![Image text](https://github.com/EosZeph/Classify/blob/main/%E5%8F%8D%E8%AF%88%E5%AE%A3%E4%BC%A0.png）
+![Image text](https://github.com/EosZeph/Classify/blob/main/反诈宣传.png)
