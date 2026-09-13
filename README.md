@@ -55,6 +55,10 @@
 6. 返回工作台即可编辑、搜索内容。
 7. 多组项目可在工作台点击“新增分组”，每个分组按同一套类别填写数据；侧边采集台可切换当前采集组。
 8. 点击“下载文本”，选择项目、下载格式以及需要下载的类别和内容。
+9. 
+![Image text](https://github.com/EosZeph/Classify/blob/main/pict/1.png)
+![Image text](https://github.com/EosZeph/Classify/blob/main/pict/2.png)
+![Image text](https://github.com/EosZeph/Classify/blob/main/pict/3.png)
 
 ## 下载格式
 
