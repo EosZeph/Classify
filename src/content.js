@@ -1511,6 +1511,9 @@
           removeButton.title = "删除";
           removeButton.dataset.deleteItem = item.id;
           removeButton.dataset.categoryId = category.id;
+          if (activeGroup?.id) {
+            removeButton.dataset.groupId = activeGroup.id;
+          }
           removeButton.innerHTML =
             '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/></svg>';
 
@@ -1915,16 +1918,23 @@
 
       busy = true;
       try {
-        const response = await sendMessage("DELETE_ITEM", {
+        const response = await sendMessage(
+          deleteButton.dataset.groupId
+            ? "DELETE_GROUP_VALUE"
+            : "DELETE_ITEM",
+          {
           projectId: project.id,
           categoryId: deleteButton.dataset.categoryId,
-          itemId: deleteButton.dataset.deleteItem
-        });
+          itemId: deleteButton.dataset.deleteItem,
+          groupId: deleteButton.dataset.groupId
+          }
+        );
         currentState = response.state;
         renderDrawer();
         showToast("采集内容已删除。");
       } catch (error) {
         showToast(error.message, "error");
+        refreshState().catch(() => {});
       } finally {
         busy = false;
         renderDrawer();

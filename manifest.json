@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "归类采集工作台",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "author": "Eoszeph",
   "description": "支持单组与多组项目的网页文本采集扩展，提供类别归档、侧边预览及 TXT / DOCX 下载。",
   "minimum_chrome_version": "109",

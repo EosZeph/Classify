@@ -453,6 +453,24 @@ async function handleMessage(message, sender) {
       return enqueueMutation((state) => {
         const project = requireProject(state, payload.projectId);
         const category = requireCategory(project, payload.categoryId);
+
+        if (project.mode === "multi") {
+          const group =
+            project.groups.find(
+              (candidate) => candidate.id === payload.groupId
+            ) ||
+            project.groups.find(
+              (candidate) => candidate.id === project.activeGroupId
+            );
+          if (!group || !group.values[category.id]) {
+            throw new Error("分组内容不存在或已被删除。");
+          }
+          delete group.values[category.id];
+          group.updatedAt = ArchiveStore.nowIso();
+          ArchiveStore.touchProject(project);
+          return true;
+        }
+
         const index = category.items.findIndex(
           (item) => item.id === payload.itemId
         );
