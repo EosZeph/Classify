@@ -3,9 +3,6 @@
 
 一个可直接加载到 Chrome / Edge 的 Manifest V3 扩展，用于把网页中选中的文本按类别归档到本地项目工作台。
 
-作者：Eoszeph  
-许可证：MIT
-
 ## 功能
 
 - Popup 弹窗：启动或停止采集、新建项目、打开工作台、查看并切换最近项目。
@@ -55,7 +52,7 @@
 6. 返回工作台即可编辑、搜索内容。
 7. 多组项目可在工作台点击“新增分组”，每个分组按同一套类别填写数据；侧边采集台可切换当前采集组。
 8. 点击“下载文本”，选择项目、下载格式以及需要下载的类别和内容。
-9. 
+
 ![Image text](https://github.com/EosZeph/Classify/blob/main/pict/1.png)
 ![Image text](https://github.com/EosZeph/Classify/blob/main/pict/2.png)
 ![Image text](https://github.com/EosZeph/Classify/blob/main/pict/3.png)
