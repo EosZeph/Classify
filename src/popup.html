@@ -72,7 +72,7 @@
           </svg>
           <span>新建项目</span>
         </button>
-        <button id="open-workspace-button" class="secondary-button" type="button">
+        <button id="open-workspace-button" class="secondary-button accent-cyan" type="button">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Z" />
             <path d="M8 8h8" />
@@ -99,7 +99,7 @@
           <path d="M12 3 5 6v5c0 4.6 2.9 8.4 7 10 4.1-1.6 7-5.4 7-10V6l-7-3Z" />
           <path d="m9.5 12 1.7 1.7 3.6-4" />
         </svg>
-        <span>所有采集内容仅保存在本机浏览器中 · 作者 Eoszeph</span>
+        <span>所有采集内容仅保存在本机浏览器中 · Zeph</span>
       </footer>
     </main>
 
@@ -138,6 +138,13 @@
         <p id="name-hint" class="field-hint">
           默认使用当前系统时间，可手动修改。
         </p>
+
+        <label class="field">
+          <span>项目模板</span>
+          <select id="popup-template-select">
+            <option value="">不使用模板</option>
+          </select>
+        </label>
 
         <fieldset class="popup-mode-field">
           <legend>项目模式</legend>

@@ -17,6 +17,10 @@ const projectList = document.querySelector("#project-list");
 const sidebarProjectCount = document.querySelector(
   "#sidebar-project-count"
 );
+const sidebarTemplateCount = document.querySelector(
+  "#sidebar-template-count"
+);
+const templateList = document.querySelector("#template-list");
 const sidebarNewProject = document.querySelector("#sidebar-new-project");
 const projectTitle = document.querySelector("#project-title");
 const projectMeta = document.querySelector("#project-meta");
@@ -34,16 +38,17 @@ const deleteProjectButton = document.querySelector("#delete-project");
 const addCategoryButton = document.querySelector("#add-category");
 const addGroupButton = document.querySelector("#add-group");
 const exportTextButton = document.querySelector("#export-text");
-const exportCsvButton = document.querySelector("#export-csv");
+const exportDocButton = document.querySelector("#export-doc");
+const exportTableButton = document.querySelector("#export-table");
+const saveTemplateButton = document.querySelector("#save-template");
+const lockProjectButton = document.querySelector("#lock-project");
 const workspaceCollectionToggle = document.querySelector(
   "#workspace-collection-toggle"
 );
 const workspaceCollectionLabel = document.querySelector(
   "#workspace-collection-label"
 );
-const cleanLegacyDataButton = document.querySelector(
-  "#clean-legacy-data"
-);
+const clearAllProjectsButton = document.querySelector("#clear-all-projects");
 
 const projectDialog = document.querySelector("#project-dialog");
 const projectForm = document.querySelector("#project-form");
@@ -54,6 +59,7 @@ const projectModeInputs = document.querySelectorAll(
 );
 const projectFormError = document.querySelector("#project-form-error");
 const projectSubmit = document.querySelector("#project-submit");
+const projectTemplateSelect = document.querySelector("#project-template-select");
 const projectCategoryBuilder = document.querySelector(
   "#project-category-builder"
 );
@@ -89,6 +95,15 @@ const itemFormError = document.querySelector("#item-form-error");
 const exportDialog = document.querySelector("#export-dialog");
 const exportProjectSelect = document.querySelector("#export-project-select");
 const exportFileFormat = document.querySelector("#export-file-format");
+const multiExportOptions = document.querySelector("#multi-export-options");
+const exportIncludeSummary = document.querySelector("#export-include-summary");
+const exportIncludeEnding = document.querySelector("#export-include-ending");
+const exportSeparateGroups = document.querySelector("#export-separate-groups");
+const separateExportOptions = document.querySelector(
+  "#separate-export-options"
+);
+const exportFilenameCategory = document.querySelector("#export-filename-category");
+const exportSeparateMode = document.querySelector("#export-separate-mode");
 const exportSelectionCount = document.querySelector(
   "#export-selection-count"
 );
@@ -98,6 +113,21 @@ const exportTree = document.querySelector("#export-tree");
 const downloadTextFileButton = document.querySelector(
   "#download-text-file"
 );
+const exportPreviewContent = document.querySelector(
+  "#export-preview-content"
+);
+
+const templateDialog = document.querySelector("#template-dialog");
+const templateForm = document.querySelector("#template-form");
+const templateNameInput = document.querySelector("#template-name-input");
+const templateFormError = document.querySelector("#template-form-error");
+
+const clearProjectsDialog = document.querySelector("#clear-projects-dialog");
+const clearProjectsForm = document.querySelector("#clear-projects-form");
+const clearProjectConfirmation = document.querySelector(
+  "#clear-project-confirmation"
+);
+const clearProjectsError = document.querySelector("#clear-projects-error");
 
 const confirmDialog = document.querySelector("#confirm-dialog");
 const confirmTitle = document.querySelector("#confirm-title");
@@ -233,7 +263,10 @@ function setWorkspaceEnabled(enabled) {
   addCategoryButton.disabled = !enabled;
   addGroupButton.disabled = !enabled;
   exportTextButton.disabled = !enabled;
-  exportCsvButton.disabled = !enabled;
+  exportDocButton.disabled = !enabled;
+  exportTableButton.disabled = !enabled;
+  saveTemplateButton.disabled = !enabled;
+  lockProjectButton.disabled = !enabled;
   searchInput.disabled = !enabled;
 }
 
@@ -287,11 +320,73 @@ function renderSidebar() {
     )}`;
 
     main.append(name, meta);
-    button.append(glyph, main);
+
+    const lockButton = document.createElement("button");
+    lockButton.type = "button";
+    lockButton.className = "project-lock-toggle";
+    lockButton.dataset.action = "toggle-project-lock";
+    lockButton.dataset.projectId = project.id;
+    lockButton.title = project.locked ? "解锁项目" : "锁定项目";
+    lockButton.setAttribute(
+      "aria-label",
+      project.locked ? "解锁项目" : "锁定项目"
+    );
+    lockButton.innerHTML = project.locked
+      ? '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7-2"/></svg>';
+
+    button.append(glyph, main, lockButton);
     fragment.append(button);
   });
 
   projectList.replaceChildren(fragment);
+}
+
+function renderTemplateList() {
+  const templates = state.templates || [];
+  sidebarTemplateCount.textContent = String(templates.length);
+  if (!templates.length) {
+    const empty = document.createElement("p");
+    empty.className = "sidebar-empty";
+    empty.textContent = "暂无模板";
+    templateList.replaceChildren(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  templates.forEach((template) => {
+    const card = document.createElement("div");
+    card.className = "template-item";
+    card.dataset.templateId = template.id;
+
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "template-main";
+    main.dataset.action = "use-template";
+    main.dataset.templateId = template.id;
+
+    const name = document.createElement("strong");
+    name.textContent = template.name;
+    const meta = document.createElement("span");
+    meta.textContent = `${
+      template.mode === "multi" ? "多组" : "单组"
+    } · ${template.categories.length} 个类别`;
+    main.append(name, meta);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "template-delete";
+    remove.dataset.action = "delete-template";
+    remove.dataset.templateId = template.id;
+    remove.title = "删除模板";
+    remove.setAttribute("aria-label", "删除模板");
+    remove.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/></svg>';
+
+    card.append(main, remove);
+    fragment.append(card);
+  });
+  templateList.replaceChildren(fragment);
 }
 
 function renderProjectHeader(project) {
@@ -314,7 +409,19 @@ function renderProjectHeader(project) {
   itemCount.textContent = String(getProjectEntryCount(project));
   updatedAt.textContent = formatRelativeTime(project.updatedAt);
   addGroupButton.hidden = project.mode !== "multi";
+  lockProjectButton.querySelector("span").textContent = project.locked
+    ? "已锁定"
+    : "锁定";
+  lockProjectButton.querySelector("svg").innerHTML = project.locked
+    ? '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'
+    : '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7-2"/>';
+  lockProjectButton.classList.toggle("accent-amber", !project.locked);
+  lockProjectButton.classList.toggle("accent-green", project.locked);
   setWorkspaceEnabled(true);
+  deleteProjectButton.disabled = project.locked;
+  deleteProjectButton.title = project.locked
+    ? "项目已锁定，请先解锁"
+    : "删除当前项目";
 }
 
 function getFilteredCategories(project, query) {
@@ -549,7 +656,7 @@ function renderEmptyWorkspace(project, hasSearchResults) {
   emptyNewProject.querySelector("span").textContent = "新增类别";
 }
 
-function renderGroupCard(project, group, query) {
+function renderGroupCard(project, group, query, groupIndex, groupTotal) {
   const normalizedQuery = query.toLocaleLowerCase("zh-CN");
   const visibleCategories = project.categories.filter((category) => {
     if (!query) {
@@ -633,6 +740,30 @@ function renderGroupCard(project, group, query) {
         </div>
         <div class="group-header-actions">
           <button
+            class="icon-button order-icon"
+            type="button"
+            data-action="move-group-up"
+            data-group-id="${escapeHtml(group.id)}"
+            title="分组上移"
+            ${groupIndex === 0 ? "disabled" : ""}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m18 15-6-6-6 6"></path>
+            </svg>
+          </button>
+          <button
+            class="icon-button order-icon"
+            type="button"
+            data-action="move-group-down"
+            data-group-id="${escapeHtml(group.id)}"
+            title="分组下移"
+            ${groupIndex === groupTotal - 1 ? "disabled" : ""}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <button
             class="group-active-button"
             type="button"
             data-action="set-active-group"
@@ -648,7 +779,7 @@ function renderGroupCard(project, group, query) {
             data-group-id="${escapeHtml(group.id)}"
             title="删除分组"
             aria-label="删除分组"
-            ${project.groups.length === 1 ? "disabled" : ""}
+            ${project.groups.length === 1 || project.locked ? "disabled" : ""}
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M3 6h18"></path>
@@ -666,10 +797,67 @@ function renderGroupCard(project, group, query) {
 function renderGroups(project) {
   const query = searchInput.value.trim();
   const groupMarkup = project.groups
-    .map((group) => renderGroupCard(project, group, query))
+    .map((group, index) =>
+      renderGroupCard(
+        project,
+        group,
+        query,
+        index,
+        project.groups.length
+      )
+    )
     .filter(Boolean);
-  categoryGrid.innerHTML = groupMarkup.join("");
-  renderEmptyWorkspace(project, groupMarkup.length > 0);
+  const categoryOrder = project.categories
+    .map(
+      (category, index) => `
+        <span class="multi-category-chip">
+          <span
+            class="group-field-dot"
+            style="background:${escapeHtml(category.color)}"
+          ></span>
+          <span>${escapeHtml(category.name)}</span>
+          <button
+            type="button"
+            data-action="move-multi-category-up"
+            data-category-id="${escapeHtml(category.id)}"
+            ${index === 0 ? "disabled" : ""}
+            title="类别上移"
+          >↑</button>
+          <button
+            type="button"
+            data-action="move-multi-category-down"
+            data-category-id="${escapeHtml(category.id)}"
+            ${index === project.categories.length - 1 ? "disabled" : ""}
+            title="类别下移"
+          >↓</button>
+        </span>
+      `
+    )
+    .join("");
+  categoryGrid.innerHTML = `
+    <section class="multi-order-bar">
+      <span class="multi-order-title">类别顺序</span>
+      <div class="multi-category-order">${categoryOrder}</div>
+    </section>
+    <section class="multi-fixed-card">
+      <span class="multi-fixed-label">摘要</span>
+      <textarea
+        data-multi-summary
+        maxlength="50000"
+        placeholder="摘要内容，下载时排在最前面"
+      >${escapeHtml(project.summary || "")}</textarea>
+    </section>
+    ${groupMarkup.join("")}
+    <section class="multi-fixed-card">
+      <span class="multi-fixed-label">结尾</span>
+      <textarea
+        data-multi-ending
+        maxlength="50000"
+        placeholder="结尾内容，下载时排在最后面"
+      >${escapeHtml(project.ending || "")}</textarea>
+    </section>
+  `;
+  renderEmptyWorkspace(project, true);
 }
 
 function renderCategories(project) {
@@ -735,12 +923,46 @@ async function moveCategory(project, categoryId, direction) {
   }
 }
 
+async function moveGroup(project, groupId, direction) {
+  const index = project.groups.findIndex((group) => group.id === groupId);
+  const targetIndex = index + direction;
+  if (index === -1 || targetIndex < 0 || targetIndex >= project.groups.length) {
+    return;
+  }
+  const orderedIds = project.groups.map((group) => group.id);
+  [orderedIds[index], orderedIds[targetIndex]] = [
+    orderedIds[targetIndex],
+    orderedIds[index]
+  ];
+  try {
+    const response = await sendMessage("REORDER_GROUPS", {
+      projectId: project.id,
+      orderedIds
+    });
+    state = response.state;
+    render();
+    showToast("分组顺序已更新。");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
 function render() {
   renderCollectionStatus();
   renderSidebar();
+  renderTemplateList();
   const project = getCurrentProject();
   renderProjectHeader(project);
   renderCategories(project);
+  if (project?.locked) {
+    document
+      .querySelectorAll(
+        '[data-action="delete-category"], [data-action="delete-item"], [data-action="delete-group"], [data-action="clear-group-value"]'
+      )
+      .forEach((button) => {
+        button.disabled = true;
+      });
+  }
 }
 
 async function refreshState(preferredProjectId) {
@@ -770,9 +992,30 @@ function createSystemTimeName() {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
-function renderProjectPresetOptions() {
+function renderProjectPresetOptions(categoryOrder = []) {
+  const orderedTemplates = categoryOrder.length
+    ? categoryOrder
+        .map((category) =>
+          ArchiveStore.CATEGORY_TEMPLATES.find(
+            (candidate) =>
+              candidate.key === category.key ||
+              candidate.name === category.name
+          )
+        )
+        .filter(Boolean)
+        .concat(
+          ArchiveStore.CATEGORY_TEMPLATES.filter(
+            (candidate) =>
+              !categoryOrder.some(
+                (category) =>
+                  category.key === candidate.key ||
+                  category.name === candidate.name
+              )
+          )
+        )
+    : ArchiveStore.CATEGORY_TEMPLATES;
   projectPresetOptions.replaceChildren(
-    ...ArchiveStore.CATEGORY_TEMPLATES.map((category) => {
+    ...orderedTemplates.map((category) => {
       const chip = document.createElement("label");
       chip.className = "project-preset-chip";
 
@@ -898,12 +1141,18 @@ function addProjectCustomCategory() {
 }
 
 function getSelectedProjectCategories() {
-  const presets = ArchiveStore.CATEGORY_TEMPLATES.filter((category) => {
-    const checkbox = projectPresetOptions.querySelector(
-      `input[data-category-key="${category.key}"]`
-    );
-    return checkbox?.checked;
-  }).map((category) => ({ ...category }));
+  const presets = Array.from(
+    projectPresetOptions.querySelectorAll(
+      "input[data-category-key]:checked"
+    )
+  )
+    .map((checkbox) =>
+      ArchiveStore.CATEGORY_TEMPLATES.find(
+        (category) => category.key === checkbox.dataset.categoryKey
+      )
+    )
+    .filter(Boolean)
+    .map((category) => ({ ...category }));
 
   return [
     ...presets,
@@ -918,6 +1167,58 @@ function getSelectedProjectMode() {
   );
 }
 
+function renderProjectTemplateSelect() {
+  projectTemplateSelect.replaceChildren();
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "不使用模板";
+  projectTemplateSelect.append(empty);
+  state.templates.forEach((template) => {
+    const option = document.createElement("option");
+    option.value = template.id;
+    option.textContent = template.name;
+    projectTemplateSelect.append(option);
+  });
+}
+
+function applyProjectTemplate(template) {
+  if (!template) {
+    return;
+  }
+  projectModeInputs.forEach((input) => {
+    input.checked = input.value === template.mode;
+  });
+
+  const presetNames = new Set(
+    ArchiveStore.CATEGORY_TEMPLATES.map((category) => category.name)
+  );
+  const presetKeys = new Set(
+    template.categories
+      .filter((category) => presetNames.has(category.name))
+      .map((category) => category.name)
+  );
+  renderProjectPresetOptions(template.categories);
+  projectPresetOptions
+    .querySelectorAll('input[data-category-key]')
+    .forEach((checkbox) => {
+      const category = ArchiveStore.CATEGORY_TEMPLATES.find(
+        (candidate) => candidate.key === checkbox.dataset.categoryKey
+      );
+      checkbox.checked = Boolean(category && presetKeys.has(category.name));
+    });
+  projectCustomCategories = template.categories
+    .filter((category) => !presetNames.has(category.name))
+    .map((category, index) => ({
+      id: ArchiveStore.createId("custom"),
+      key: "custom",
+      name: category.name,
+      color: category.color,
+      description: category.description,
+      position: index
+    }));
+  renderProjectCustomCategories();
+}
+
 function openProjectDialog(mode = "create", project = null) {
   projectDialogMode = mode;
   projectFormError.textContent = "";
@@ -929,9 +1230,13 @@ function openProjectDialog(mode = "create", project = null) {
   projectCustomCategories = [];
   projectCustomCategoryName.value = "";
   if (mode === "create") {
+    renderProjectTemplateSelect();
     renderProjectPresetOptions();
     renderProjectCustomCategories();
+  } else {
+    renderProjectTemplateSelect();
   }
+  projectTemplateSelect.closest(".field").hidden = mode === "edit";
   projectDialogTitle.textContent =
     mode === "edit" ? "修改项目名称" : "新建项目";
   projectSubmit.textContent = mode === "edit" ? "保存修改" : "创建项目";
@@ -1029,39 +1334,6 @@ function sanitizeFilename(value) {
   );
 }
 
-function escapeCsv(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-function exportCsv(project) {
-  const rows = [
-    ["类别", "内容", "来源标题", "来源网址", "采集时间"]
-  ];
-
-  project.categories.forEach((category) => {
-    category.items.forEach((item) => {
-      rows.push([
-        category.name,
-        item.text,
-        item.sourceTitle,
-        item.sourceUrl,
-        item.capturedAt
-      ]);
-    });
-  });
-
-  const csv = `\ufeff${rows
-    .map((row) => row.map(escapeCsv).join(","))
-    .join("\r\n")}`;
-  downloadBlob(
-    csv,
-    "text/csv;charset=utf-8",
-    `${sanitizeFilename(project.name)}.csv`
-  );
-  showToast("CSV 文件已导出。");
-}
-
 function renderExportProjectSelect() {
   exportProjectSelect.replaceChildren(
     ...state.projects.map((project) => {
@@ -1079,7 +1351,14 @@ function renderExportTree() {
     (candidate) => candidate.id === exportProjectSelect.value
   );
 
+  multiExportOptions.hidden = project?.mode !== "multi";
+  separateExportOptions.hidden = exportFileFormat.value === "xlsx";
+  renderExportFilenameCategories(project);
+  exportFilenameCategory.disabled = !exportSeparateGroups.checked;
+  exportSeparateMode.disabled = !exportSeparateGroups.checked;
   if (project?.mode === "multi") {
+    exportIncludeSummary.checked = Boolean(project.summary);
+    exportIncludeEnding.checked = Boolean(project.ending);
     renderMultiExportTree(project);
     return;
   }
@@ -1142,6 +1421,23 @@ function renderExportTree() {
   updateExportSelectionState();
 }
 
+function renderExportFilenameCategories(project) {
+  exportFilenameCategory.replaceChildren();
+  if (!project) {
+    return;
+  }
+  const groupOption = document.createElement("option");
+  groupOption.value = "";
+  groupOption.textContent = "使用分组名称";
+  exportFilenameCategory.append(groupOption);
+  project.categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    exportFilenameCategory.append(option);
+  });
+}
+
 function renderMultiExportTree(project) {
   if (!project.groups.length) {
     exportTree.innerHTML =
@@ -1155,21 +1451,17 @@ function renderMultiExportTree(project) {
       const fields = project.categories
         .map((category) => {
           const value = group.values[category.id]?.text || "";
-          if (!value) {
-            return "";
-          }
           return `
             <div class="export-item export-group-value">
               <span class="export-category-dot" style="background:${escapeHtml(
                 category.color
               )}"></span>
-              <span><strong>${escapeHtml(category.name)}：</strong>${escapeHtml(
-                value
-              )}</span>
+              <span><strong>${escapeHtml(category.name)}：</strong>${
+                value ? escapeHtml(value) : "（空）"
+              }</span>
             </div>
           `;
         })
-        .filter(Boolean)
         .join("");
 
       return `
@@ -1201,6 +1493,85 @@ function renderMultiExportTree(project) {
   updateExportSelectionState();
 }
 
+function renderExportPreview() {
+  const project = state.projects.find(
+    (candidate) => candidate.id === exportProjectSelect.value
+  );
+  if (!project) {
+    exportPreviewContent.textContent = "";
+    return;
+  }
+
+  const format = exportFileFormat.value;
+  const formatLabel =
+    format === "xlsx"
+      ? "Excel XLSX"
+      : format === "docx"
+        ? "Word DOCX"
+        : "文本 TXT";
+
+  if (project.mode === "multi") {
+    const selectedGroups = project.groups.filter((group) => {
+      const checkbox = exportTree.querySelector(
+        `input[data-export-group-check="${CSS.escape(group.id)}"]`
+      );
+      return checkbox?.checked;
+    });
+
+    if (format === "xlsx") {
+      const table = buildProjectTable(project);
+      const previewRows = table.rows.slice(0, 5).map((row) =>
+        row
+          .map((value) => String(value ?? "").replace(/\s+/g, " "))
+          .join("  |  ")
+      );
+      exportPreviewContent.textContent = `${formatLabel}\n${previewRows.join(
+        "\n"
+      )}${table.rows.length > 5 ? "\n..." : ""}`;
+      return;
+    }
+
+    if (exportSeparateGroups.checked) {
+      const usedNames = new Set();
+      const filenames = selectedGroups.slice(0, 5).map((group, index) => {
+        const name = getExportGroupFilename(
+          project,
+          group,
+          index,
+          usedNames
+        );
+        return `${name}.${format === "docx" ? "docx" : "txt"}`;
+      });
+      exportPreviewContent.textContent = `${formatLabel} · 分组独立文件\n${
+        filenames.join("\n") || "暂无分组"
+      }${selectedGroups.length > 5 ? "\n..." : ""}`;
+      return;
+    }
+
+    const lines = buildMultiExportLines(project);
+    exportPreviewContent.textContent = `${formatLabel}\n${lines
+      .slice(0, 6)
+      .join("\n")}${lines.length > 6 ? "\n..." : ""}`;
+    return;
+  }
+
+  const rows = buildSelectedRows(project);
+  if (format === "xlsx") {
+    const table = buildProjectTable(project);
+    exportPreviewContent.textContent = `${formatLabel}\n${table.rows
+      .slice(0, 5)
+      .map((row) => row.join("  |  "))
+      .join("\n")}`;
+    return;
+  }
+  exportPreviewContent.textContent = `${formatLabel}\n${
+    rows
+      .slice(0, 6)
+      .map((row) => `${row.category}：${row.text}`)
+      .join("\n") || "暂无内容"
+  }${rows.length > 6 ? "\n..." : ""}`;
+}
+
 function updateExportSelectionState() {
   const project = state.projects.find(
     (candidate) => candidate.id === exportProjectSelect.value
@@ -1209,8 +1580,13 @@ function updateExportSelectionState() {
     const selectedGroups = exportTree.querySelectorAll(
       "input[data-export-group-check]:checked"
     ).length;
-    exportSelectionCount.textContent = `已选择 ${selectedGroups} 个分组`;
-    downloadTextFileButton.disabled = selectedGroups === 0;
+    const fixedCount =
+      Number(exportIncludeSummary.checked) +
+      Number(exportIncludeEnding.checked);
+    exportSelectionCount.textContent = `已选择 ${selectedGroups} 个分组、${fixedCount} 个固定栏目`;
+    downloadTextFileButton.disabled =
+      selectedGroups === 0 && fixedCount === 0;
+    renderExportPreview();
     return;
   }
 
@@ -1258,6 +1634,7 @@ function updateExportSelectionState() {
   exportSelectionCount.textContent = `已选择 ${selectedItems} 条内容、${selectedCategories} 个类别`;
   downloadTextFileButton.disabled =
     selectedItems === 0 && selectedEmptyCategories === 0;
+  renderExportPreview();
 }
 
 function buildSelectedRows(project) {
@@ -1305,18 +1682,26 @@ function buildMultiExportLines(project) {
     return checkbox?.checked;
   });
 
-  return selectedGroups.map((group, index) => {
+  const groupLines = selectedGroups.map((group, index) => {
     const parts = project.categories
       .map((category) => {
         const text = group.values[category.id]?.text
           ?.replace(/\s+/g, " ")
           .trim();
-        return text ? `${category.name}：${text}` : "";
+        return `${category.name}：${text || ""}`;
       })
-      .filter(Boolean);
     const ending = index === selectedGroups.length - 1 ? "。" : "；";
     return `${parts.join("，")}${ending}`;
   });
+  const lines = [];
+  if (exportIncludeSummary.checked && project.summary) {
+    lines.push(project.summary);
+  }
+  lines.push(...groupLines);
+  if (exportIncludeEnding.checked && project.ending) {
+    lines.push(project.ending);
+  }
+  return lines;
 }
 
 function buildSelectedText(project) {
@@ -1327,6 +1712,131 @@ function buildSelectedText(project) {
   return buildSelectedRows(project)
     .map((row) => `${row.category}：${row.text}`)
     .join("\r\n");
+}
+
+function buildGroupFileLines(project, group) {
+  const parts = project.categories
+    .map((category) => {
+      const text = group.values[category.id]?.text
+        ?.replace(/\s+/g, " ")
+        .trim();
+      return `${category.name}：${text || ""}`;
+    })
+  const lines = [];
+  if (exportIncludeSummary.checked && project.summary) {
+    lines.push(project.summary);
+  }
+  lines.push(`${parts.join("，")}。`);
+  if (exportIncludeEnding.checked && project.ending) {
+    lines.push(project.ending);
+  }
+  return lines;
+}
+
+function getExportGroupFilename(project, group, index, usedNames) {
+  const categoryId = exportFilenameCategory.value;
+  const categoryValue = categoryId
+    ? group.values[categoryId]?.text
+    : "";
+  const base =
+    sanitizeFilename(categoryValue || group.name || `第 ${index + 1} 组`);
+  let filename = base;
+  let suffix = 2;
+  while (usedNames.has(filename.toLocaleLowerCase("zh-CN"))) {
+    filename = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  usedNames.add(filename.toLocaleLowerCase("zh-CN"));
+  return filename;
+}
+
+async function createGroupFileBlob(project, group, format) {
+  const lines = buildGroupFileLines(project, group);
+  if (format === "docx") {
+    const paragraphs = [];
+    if (exportIncludeSummary.checked && project.summary) {
+      paragraphs.push({ plain: project.summary });
+    }
+    project.categories.forEach((category) => {
+      paragraphs.push({
+        segments: [
+          {
+            label: category.name,
+            text: group.values[category.id]?.text || ""
+          }
+        ],
+        ending: ""
+      });
+    });
+    if (exportIncludeEnding.checked && project.ending) {
+      paragraphs.push({ plain: project.ending });
+    }
+    return ArchiveDownload.createDocxStyledBlob(
+      project.name,
+      paragraphs
+    );
+  }
+  return new Blob([lines.join("\r\n")], {
+    type: "text/plain;charset=utf-8"
+  });
+}
+
+function getExcelColumnName(index) {
+  let value = index + 1;
+  let name = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
+function buildProjectTable(project) {
+  const rows = [];
+  const merges = [];
+
+  if (project.mode === "multi") {
+    const selectedGroups = project.groups.filter((group) => {
+      const checkbox = exportTree.querySelector(
+        `input[data-export-group-check="${CSS.escape(group.id)}"]`
+      );
+      return checkbox?.checked;
+    });
+    const columnCount = project.categories.length + 1;
+    const lastColumn = getExcelColumnName(columnCount - 1);
+    if (exportIncludeSummary.checked && project.summary) {
+      rows.push([project.summary]);
+      merges.push(`A1:${lastColumn}1`);
+    }
+    rows.push([
+      "分组",
+      ...project.categories.map((category) => category.name)
+    ]);
+    selectedGroups.forEach((group) => {
+      rows.push([
+        group.name,
+        ...project.categories.map(
+          (category) => group.values[category.id]?.text || ""
+        )
+      ]);
+    });
+    if (exportIncludeEnding.checked && project.ending) {
+      const rowNumber = rows.length + 1;
+      rows.push([project.ending]);
+      merges.push(`A${rowNumber}:${lastColumn}${rowNumber}`);
+    }
+    return { rows, merges };
+  }
+
+  rows.push(["类别", "内容"]);
+  project.categories.forEach((category) => {
+    rows.push([
+      category.name,
+      category.items.map((item) => item.text).join("\n")
+    ]);
+  });
+  return { rows, merges };
 }
 
 function openExportDialog() {
@@ -1372,9 +1882,119 @@ projectCustomCategoryList.addEventListener("click", (event) => {
   }
 });
 
+projectTemplateSelect.addEventListener("change", () => {
+  const template = state.templates.find(
+    (candidate) => candidate.id === projectTemplateSelect.value
+  );
+  if (template) {
+    applyProjectTemplate(template);
+  } else {
+    renderProjectPresetOptions();
+    projectCustomCategories = [];
+    renderProjectCustomCategories();
+  }
+});
+
+saveTemplateButton.addEventListener("click", () => {
+  const project = getCurrentProject();
+  if (!project) {
+    return;
+  }
+  templateNameInput.value = `${project.name} 模板`;
+  templateFormError.textContent = "";
+  templateDialog.showModal();
+  window.setTimeout(() => templateNameInput.select(), 30);
+});
+
+templateForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const project = getCurrentProject();
+  const name = templateNameInput.value.trim();
+  if (!project || !name) {
+    templateFormError.textContent = "请输入模板名称。";
+    return;
+  }
+
+  const submitButton = templateForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const response = await sendMessage("SAVE_TEMPLATE", {
+      projectId: project.id,
+      name
+    });
+    state = response.state;
+    templateDialog.close();
+    showToast("项目模板已保存。");
+  } catch (error) {
+    templateFormError.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+lockProjectButton.addEventListener("click", async () => {
+  const project = getCurrentProject();
+  if (!project) {
+    return;
+  }
+  const wasLocked = project.locked;
+  try {
+    const response = await sendMessage("UPDATE_PROJECT", {
+      projectId: project.id,
+      locked: !project.locked
+    });
+    state = response.state;
+    render();
+    showToast(wasLocked ? "项目已解锁。" : "项目已锁定。");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 sidebarNewProject.addEventListener("click", () =>
   openProjectDialog("create")
 );
+
+templateList.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) {
+    return;
+  }
+  const template = state.templates.find(
+    (candidate) => candidate.id === button.dataset.templateId
+  );
+  if (!template) {
+    return;
+  }
+
+  if (button.dataset.action === "use-template") {
+    openProjectDialog("create");
+    projectTemplateSelect.value = template.id;
+    applyProjectTemplate(template);
+    return;
+  }
+
+  if (button.dataset.action === "delete-template") {
+    const confirmed = await askConfirm({
+      title: "删除项目模板？",
+      message: `“${template.name}”模板将被永久删除，不影响已有项目。`,
+      confirmLabel: "删除模板"
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const response = await sendMessage("DELETE_TEMPLATE", {
+        templateId: template.id
+      });
+      state = response.state;
+      render();
+      showToast("模板已删除。");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+});
 
 emptyNewProject.addEventListener("click", () => {
   const project = getCurrentProject();
@@ -1388,6 +2008,32 @@ emptyNewProject.addEventListener("click", () => {
 });
 
 projectList.addEventListener("click", async (event) => {
+  const lockButton = event.target.closest(
+    'button[data-action="toggle-project-lock"]'
+  );
+  if (lockButton) {
+    event.stopPropagation();
+    const project = state.projects.find(
+      (candidate) => candidate.id === lockButton.dataset.projectId
+    );
+    if (!project) {
+      return;
+    }
+    const wasLocked = project.locked;
+    try {
+      const response = await sendMessage("UPDATE_PROJECT", {
+        projectId: project.id,
+        locked: !project.locked
+      });
+      state = response.state;
+      render();
+      showToast(wasLocked ? "项目已解锁。" : "项目已锁定。");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
   const button = event.target.closest(".project-item");
   if (!button || button.dataset.projectId === state.activeProjectId) {
     return;
@@ -1453,65 +2099,50 @@ workspaceCollectionToggle.addEventListener("click", async () => {
   }
 });
 
-cleanLegacyDataButton.addEventListener("click", async () => {
-  const namedLegacyProjects =
-    state?.projects.filter((project) => {
-      const normalizedName = project.name
-        .replace(/\s+/g, "")
-        .toLocaleLowerCase("zh-CN");
-      return (
-        normalizedName === "项目1" ||
-        normalizedName === "未命名项目1"
-      );
-    }) || [];
-  const emptyLegacyProjects = namedLegacyProjects.filter((project) =>
-    project.categories.every((category) => category.items.length === 0)
-  );
-  const nonEmptyLegacyProjects = namedLegacyProjects.filter(
-    (project) => !emptyLegacyProjects.includes(project)
-  );
-
-  if (!namedLegacyProjects.length) {
-    showToast("没有发现旧版项目1。");
+clearAllProjectsButton.addEventListener("click", async () => {
+  if (!state.projects.length) {
+    showToast("当前没有项目需要清空。");
     return;
   }
 
-  const nonEmptyItemCount = nonEmptyLegacyProjects.reduce(
-    (projectTotal, project) =>
-      projectTotal +
-      project.categories.reduce(
-        (categoryTotal, category) =>
-          categoryTotal + category.items.length,
-        0
-      ),
-    0
-  );
-  const shouldIncludeContent = nonEmptyLegacyProjects.length > 0;
-  const shouldClean = await askConfirm({
-    title: shouldIncludeContent
-      ? "强制清理旧版项目1？"
-      : "清理旧版空白项目？",
-    message: shouldIncludeContent
-      ? `发现 ${nonEmptyLegacyProjects.length} 个项目1包含 ${nonEmptyItemCount} 条内容。继续将同时删除这些内容和 ${emptyLegacyProjects.length} 个空白旧项目，且无法恢复。`
-      : `将移除 ${emptyLegacyProjects.length} 个名称为“项目1”且没有任何内容的旧版项目。`,
-    confirmLabel: shouldIncludeContent ? "确认强制清理" : "开始清理"
+  const firstConfirmed = await askConfirm({
+    title: "清空全部项目？",
+    message: `将删除 ${state.projects.length} 个项目的全部内容。此操作无法恢复。`,
+    confirmLabel: "继续确认"
   });
-  if (!shouldClean) {
+  if (!firstConfirmed) {
     return;
   }
 
-  cleanLegacyDataButton.disabled = true;
+  clearProjectConfirmation.value = "";
+  clearProjectsError.textContent = "";
+  clearProjectsDialog.showModal();
+  window.setTimeout(() => clearProjectConfirmation.focus(), 30);
+});
+
+clearProjectsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (clearProjectConfirmation.value.trim() !== "清空项目") {
+    clearProjectsError.textContent = "请输入“清空项目”完成二次确认。";
+    return;
+  }
+
+  const submitButton = clearProjectsForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
   try {
-    const response = await sendMessage("CLEAN_LEGACY_DATA", {
-      includeNonEmpty: shouldIncludeContent
-    });
+    const response = await sendMessage("CLEAR_ALL_PROJECTS");
     state = response.state;
+    clearProjectsDialog.close();
+    searchInput.value = "";
+    const url = new URL(window.location.href);
+    url.searchParams.delete("projectId");
+    history.replaceState(null, "", url);
     render();
-    showToast(`已清理 ${response.result} 个旧版项目1。`);
+    showToast(`已清空 ${response.result} 个项目。`);
   } catch (error) {
-    showToast(error.message, "error");
+    clearProjectsError.textContent = error.message;
   } finally {
-    cleanLegacyDataButton.disabled = false;
+    submitButton.disabled = false;
   }
 });
 
@@ -1547,13 +2178,18 @@ deleteProjectButton.addEventListener("click", async () => {
   }
 });
 
-exportTextButton.addEventListener("click", openExportDialog);
+exportTextButton.addEventListener("click", () => {
+  exportFileFormat.value = "txt";
+  openExportDialog();
+});
+exportDocButton.addEventListener("click", () => {
+  exportFileFormat.value = "docx";
+  openExportDialog();
+});
 
-exportCsvButton.addEventListener("click", () => {
-  const project = getCurrentProject();
-  if (project) {
-    exportCsv(project);
-  }
+exportTableButton.addEventListener("click", () => {
+  exportFileFormat.value = "xlsx";
+  openExportDialog();
 });
 
 exportProjectSelect.addEventListener("change", renderExportTree);
@@ -1591,7 +2227,69 @@ exportTree.addEventListener("change", (event) => {
   updateExportSelectionState();
 });
 
-downloadTextFileButton.addEventListener("click", () => {
+exportIncludeSummary.addEventListener("change", updateExportSelectionState);
+exportIncludeEnding.addEventListener("change", updateExportSelectionState);
+exportSeparateGroups.addEventListener("change", () => {
+  exportFilenameCategory.disabled = !exportSeparateGroups.checked;
+  exportSeparateMode.disabled = !exportSeparateGroups.checked;
+  renderExportPreview();
+});
+exportFileFormat.addEventListener("change", () => {
+  if (exportFileFormat.value === "xlsx") {
+    exportSeparateGroups.checked = false;
+  }
+  exportFilenameCategory.disabled =
+    !exportSeparateGroups.checked || exportFileFormat.value === "xlsx";
+  exportSeparateMode.disabled =
+    !exportSeparateGroups.checked || exportFileFormat.value === "xlsx";
+  separateExportOptions.hidden = exportFileFormat.value === "xlsx";
+  renderExportPreview();
+});
+exportSeparateMode.addEventListener("change", renderExportPreview);
+exportFilenameCategory.addEventListener("change", renderExportPreview);
+
+async function downloadSeparateGroupFiles(project, format) {
+  const selectedGroups = project.groups.filter((group) => {
+    const checkbox = exportTree.querySelector(
+      `input[data-export-group-check="${CSS.escape(group.id)}"]`
+    );
+    return checkbox?.checked;
+  });
+  const usedNames = new Set();
+  const files = [];
+
+  for (const [index, group] of selectedGroups.entries()) {
+    const blob = await createGroupFileBlob(project, group, format);
+    const filename = getExportGroupFilename(
+      project,
+      group,
+      index,
+      usedNames
+    );
+    const extension = format === "docx" ? "docx" : "txt";
+    const fullName = `${filename}.${extension}`;
+    if (exportSeparateMode.value === "multiple") {
+      window.setTimeout(() => {
+        ArchiveDownload.triggerDownload(blob, fullName);
+      }, index * 180);
+    } else {
+      files.push({
+        name: fullName,
+        content: new Uint8Array(await blob.arrayBuffer())
+      });
+    }
+  }
+
+  if (exportSeparateMode.value === "zip" && files.length) {
+    const zip = ArchiveDownload.createZip(files);
+    ArchiveDownload.triggerDownload(
+      new Blob([zip], { type: "application/zip" }),
+      `${sanitizeFilename(project.name)}-分组文件.zip`
+    );
+  }
+}
+
+downloadTextFileButton.addEventListener("click", async () => {
   const project = state.projects.find(
     (candidate) => candidate.id === exportProjectSelect.value
   );
@@ -1600,6 +2298,7 @@ downloadTextFileButton.addEventListener("click", () => {
   }
 
   const isMulti = project.mode === "multi";
+  const format = exportFileFormat.value;
   const rows = isMulti ? [] : buildSelectedRows(project);
   const multiLines = isMulti ? buildMultiExportLines(project) : [];
   if ((!isMulti && !rows.length) || (isMulti && !multiLines.length)) {
@@ -1609,7 +2308,29 @@ downloadTextFileButton.addEventListener("click", () => {
 
   const now = createSystemTimeName().replaceAll(":", "-");
   const baseFilename = `${sanitizeFilename(project.name)}-${now}`;
-  if (exportFileFormat.value === "docx") {
+  if (isMulti && exportSeparateGroups.checked && format !== "xlsx") {
+    await downloadSeparateGroupFiles(project, format);
+    exportDialog.close();
+    showToast(
+      exportSeparateMode.value === "zip"
+        ? "分组文件 ZIP 已下载。"
+        : "分组文件已开始下载。"
+    );
+    return;
+  }
+  if (format === "xlsx") {
+    const table = buildProjectTable(project);
+    const blob = ArchiveDownload.createXlsxBlob(
+      project.name,
+      table.rows,
+      table.merges
+    );
+    ArchiveDownload.triggerDownload(blob, `${baseFilename}.xlsx`);
+    exportDialog.close();
+    showToast("Excel 表格已下载。");
+    return;
+  }
+  if (format === "docx") {
     const blob = isMulti
       ? ArchiveDownload.createDocxLinesBlob(project.name, multiLines)
       : ArchiveDownload.createDocxBlob(project.name, rows);
@@ -1763,6 +2484,23 @@ categoryGrid.addEventListener("change", async (event) => {
     return;
   }
 
+  const summaryInput = event.target.closest("textarea[data-multi-summary]");
+  const endingInput = event.target.closest("textarea[data-multi-ending]");
+  if (summaryInput || endingInput) {
+    try {
+      const response = await sendMessage("UPDATE_PROJECT", {
+        projectId: project.id,
+        summary: summaryInput?.value,
+        ending: endingInput?.value
+      });
+      state = response.state;
+      render();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
   const nameInput = event.target.closest("input[data-group-name]");
   if (nameInput) {
     try {
@@ -1783,12 +2521,34 @@ categoryGrid.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-action]");
   const groupCard = button?.closest(".group-card");
   const project = getCurrentProject();
-  if (!button || !groupCard || !project || project.mode !== "multi") {
+  if (!button || !project || project.mode !== "multi") {
     return;
   }
 
   const action = button.dataset.action;
   const groupId = button.dataset.groupId;
+  if (
+    action === "move-multi-category-up" ||
+    action === "move-multi-category-down"
+  ) {
+    await moveCategory(
+      project,
+      button.dataset.categoryId,
+      action === "move-multi-category-up" ? -1 : 1
+    );
+    return;
+  }
+  if (action === "move-group-up" || action === "move-group-down") {
+    await moveGroup(
+      project,
+      groupId,
+      action === "move-group-up" ? -1 : 1
+    );
+    return;
+  }
+  if (!groupCard) {
+    return;
+  }
   if (action === "set-active-group") {
     try {
       const response = await sendMessage("SET_ACTIVE_GROUP", {
@@ -2056,6 +2816,7 @@ async function initialize() {
   const url = new URL(window.location.href);
   const requestedProjectId = url.searchParams.get("projectId");
   const shouldCreateProject = url.searchParams.get("new") === "1";
+  const shouldOpenDownload = url.searchParams.get("download") === "1";
 
   try {
     await refreshState(requestedProjectId);
@@ -2080,6 +2841,10 @@ async function initialize() {
 
   if (shouldCreateProject || !getCurrentProject()) {
     openProjectDialog("create");
+  } else if (shouldOpenDownload) {
+    openExportDialog();
+    url.searchParams.delete("download");
+    history.replaceState(null, "", url);
   }
 }
 

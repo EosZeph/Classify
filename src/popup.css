@@ -248,6 +248,17 @@ h2 {
   background: #f8fafc;
 }
 
+.secondary-button.accent-cyan {
+  border-color: #b5d9df;
+  background: #f1fafb;
+  color: #22636d;
+}
+
+.secondary-button.accent-cyan:hover {
+  border-color: #82bdc7;
+  background: #e3f5f7;
+}
+
 .text-button {
   border: 1px solid transparent;
   background: transparent;

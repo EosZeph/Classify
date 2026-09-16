@@ -261,7 +261,7 @@
 
       .drawer-download-bar {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         align-items: center;
         gap: 7px;
         padding: 9px 14px;
@@ -960,7 +960,7 @@
     <aside id="side-drawer" class="side-drawer" data-open="false">
       <header class="drawer-header">
         <div class="drawer-title">
-          <span class="drawer-kicker">Eoszeph · 网页侧边预览</span>
+          <span class="drawer-kicker">Zeph · 网页侧边预览</span>
           <h2 id="drawer-project-name">暂无项目</h2>
         </div>
         <button
@@ -978,23 +978,18 @@
       </header>
 
       <div class="drawer-download-bar">
-        <label for="drawer-download-format">下载格式</label>
-        <select id="drawer-download-format">
-          <option value="txt">文本 TXT</option>
-          <option value="docx">Word DOCX</option>
-        </select>
         <button
-          id="drawer-download"
+          id="open-workspace-download"
           class="drawer-download-button"
           type="button"
-          title="下载当前项目"
+          title="打开工作台下载"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3v12"></path>
-            <path d="m7 10 5 5 5-5"></path>
-            <path d="M5 21h14"></path>
+            <path d="M14 4h6v6"></path>
+            <path d="m20 4-9 9"></path>
+            <path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"></path>
           </svg>
-          <span>下载当前项目</span>
+          <span>打开工作台下载</span>
         </button>
       </div>
 
@@ -1044,7 +1039,7 @@
             <span>采集后自动定位</span>
           </div>
           <div id="drawer-category-list" class="drawer-category-list"></div>
-          <p class="drawer-author">作者：Eoszeph</p>
+          <p class="drawer-author">Zeph</p>
         </section>
       </div>
     </aside>
@@ -1091,9 +1086,8 @@
   const drawerCategoryList = shadow.querySelector(
     "#drawer-category-list"
   );
-  const drawerDownloadButton = shadow.querySelector("#drawer-download");
-  const drawerDownloadFormat = shadow.querySelector(
-    "#drawer-download-format"
+  const openWorkspaceDownloadButton = shadow.querySelector(
+    "#open-workspace-download"
   );
 
   let pendingSelection = null;
@@ -1145,84 +1139,6 @@
     toastTimer = window.setTimeout(() => {
       collectorToast.dataset.visible = "false";
     }, 2400);
-  }
-
-  function sanitizeFilename(value) {
-    return (
-      value
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 60) || "采集项目"
-    );
-  }
-
-  function buildProjectRows(project) {
-    return project.categories.flatMap((category) => {
-      if (!category.items.length) {
-        return [{ category: category.name, text: "" }];
-      }
-      return category.items.map((item) => ({
-        category: category.name,
-        text: item.text.replace(/\s+/g, " ").trim()
-      }));
-    });
-  }
-
-  function buildProjectText(project) {
-    if (project.mode === "multi") {
-      return buildProjectMultiLines(project).join("\r\n");
-    }
-    return buildProjectRows(project)
-      .map((row) => `${row.category}：${row.text}`)
-      .join("\r\n");
-  }
-
-  function buildProjectMultiLines(project) {
-    return project.groups.map((group, index) => {
-      const parts = project.categories
-        .map((category) => {
-          const text = group.values[category.id]?.text
-            ?.replace(/\s+/g, " ")
-            .trim();
-          return text ? `${category.name}：${text}` : "";
-        })
-        .filter(Boolean);
-      const ending = index === project.groups.length - 1 ? "。" : "；";
-      return `${parts.join("，")}${ending}`;
-    });
-  }
-
-  function downloadProjectText(project) {
-    const content = buildProjectText(project);
-    const blob = new Blob([content], {
-      type: "text/plain;charset=utf-8"
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${sanitizeFilename(project.name)}.txt`;
-    document.documentElement.append(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function downloadProjectDocx(project) {
-    const blob =
-      project.mode === "multi"
-        ? ArchiveDownload.createDocxLinesBlob(
-            project.name,
-            buildProjectMultiLines(project)
-          )
-        : ArchiveDownload.createDocxBlob(
-            project.name,
-            buildProjectRows(project)
-          );
-    ArchiveDownload.triggerDownload(
-      blob,
-      `${ArchiveDownload.sanitizeFilename(project.name)}.docx`
-    );
   }
 
   function focusDrawerCategory(categoryId) {
@@ -1516,6 +1432,7 @@
           }
           removeButton.innerHTML =
             '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/></svg>';
+          removeButton.disabled = project.locked === true;
 
           copy.append(text, meta);
           row.append(copy, removeButton);
@@ -1578,7 +1495,7 @@
     );
 
     renderDrawerCategories(project);
-    drawerDownloadButton.disabled =
+    openWorkspaceDownloadButton.disabled =
       !project || (project.mode === "multi" && !project.groups.length);
   }
 
@@ -1964,21 +1881,22 @@
     renderDrawerCategories(getActiveProject());
   });
 
-  drawerDownloadButton.addEventListener("click", () => {
+  openWorkspaceDownloadButton.addEventListener("click", async () => {
     const project = getActiveProject();
     if (!project) {
       showToast("当前没有可下载的项目。", "error");
       return;
     }
 
-    if (drawerDownloadFormat.value === "docx") {
-      downloadProjectDocx(project);
-      showToast("Word 文档已下载。");
-      return;
+    try {
+      await sendMessage("OPEN_WORKSPACE", {
+        projectId: project.id,
+        download: true
+      });
+      showToast("已打开工作台下载窗口。");
+    } catch (error) {
+      showToast(error.message, "error");
     }
-
-    downloadProjectText(project);
-    showToast("项目文本已下载。");
   });
 
   document.addEventListener("selectionchange", () => {

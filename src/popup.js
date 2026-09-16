@@ -24,6 +24,7 @@ const addCustomCategoryButton = document.querySelector(
   "#add-custom-category"
 );
 const customCategoryList = document.querySelector("#custom-category-list");
+const popupTemplateSelect = document.querySelector("#popup-template-select");
 const popupProjectModeInputs = document.querySelectorAll(
   'input[name="popup-project-mode"]'
 );
@@ -77,9 +78,30 @@ function formatProjectMeta(project) {
   } · ${count} 项内容 · ${formatted} 更新`;
 }
 
-function renderPresetCategories() {
+function renderPresetCategories(categoryOrder = []) {
+  const orderedTemplates = categoryOrder.length
+    ? categoryOrder
+        .map((category) =>
+          ArchiveStore.CATEGORY_TEMPLATES.find(
+            (candidate) =>
+              candidate.key === category.key ||
+              candidate.name === category.name
+          )
+        )
+        .filter(Boolean)
+        .concat(
+          ArchiveStore.CATEGORY_TEMPLATES.filter(
+            (candidate) =>
+              !categoryOrder.some(
+                (category) =>
+                  category.key === candidate.key ||
+                  category.name === candidate.name
+              )
+          )
+        )
+    : ArchiveStore.CATEGORY_TEMPLATES;
   presetCategories.replaceChildren(
-    ...ArchiveStore.CATEGORY_TEMPLATES.map((category) => {
+    ...orderedTemplates.map((category) => {
       const chip = document.createElement("label");
       chip.className = "preset-chip";
 
@@ -218,17 +240,71 @@ function addCustomCategory() {
 }
 
 function getSelectedCategoryDefinitions() {
-  const presets = ArchiveStore.CATEGORY_TEMPLATES.filter((category) => {
-    const checkbox = presetCategories.querySelector(
-      `input[data-category-key="${category.key}"]`
-    );
-    return checkbox?.checked;
-  }).map((category) => ({ ...category }));
+  const presets = Array.from(
+    presetCategories.querySelectorAll(
+      "input[data-category-key]:checked"
+    )
+  )
+    .map((checkbox) =>
+      ArchiveStore.CATEGORY_TEMPLATES.find(
+        (category) => category.key === checkbox.dataset.categoryKey
+      )
+    )
+    .filter(Boolean)
+    .map((category) => ({ ...category }));
 
   return [
     ...presets,
     ...customCategories.map((category) => ({ ...category }))
   ];
+}
+
+function renderPopupTemplates() {
+  popupTemplateSelect.replaceChildren();
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "不使用模板";
+  popupTemplateSelect.append(empty);
+  (currentState?.templates || []).forEach((template) => {
+    const option = document.createElement("option");
+    option.value = template.id;
+    option.textContent = template.name;
+    popupTemplateSelect.append(option);
+  });
+}
+
+function applyPopupTemplate(template) {
+  if (!template) {
+    return;
+  }
+  popupProjectModeInputs.forEach((input) => {
+    input.checked = input.value === template.mode;
+  });
+  const presetNames = new Set(
+    ArchiveStore.CATEGORY_TEMPLATES.map((category) => category.name)
+  );
+  const selectedNames = new Set(
+    template.categories.map((category) => category.name)
+  );
+  renderPresetCategories(template.categories);
+  presetCategories
+    .querySelectorAll("input[data-category-key]")
+    .forEach((checkbox) => {
+      const category = ArchiveStore.CATEGORY_TEMPLATES.find(
+        (candidate) => candidate.key === checkbox.dataset.categoryKey
+      );
+      checkbox.checked = Boolean(category && selectedNames.has(category.name));
+    });
+  customCategories = template.categories
+    .filter((category) => !presetNames.has(category.name))
+    .map((category) => ({
+      id: ArchiveStore.createId("custom"),
+      key: "custom",
+      name: category.name,
+      color: category.color,
+      description: category.description
+    }));
+  renderCustomCategories();
 }
 
 function renderCollectionStatus() {
@@ -314,6 +390,8 @@ function openCreateDialog() {
   popupProjectModeInputs.forEach((input) => {
     input.checked = input.value === "single";
   });
+  renderPopupTemplates();
+  popupTemplateSelect.value = "";
   renderCustomCategories();
   if (!createDialog.open) {
     createDialog.showModal();
@@ -364,6 +442,21 @@ async function loadState() {
 
 newProjectButton.addEventListener("click", openCreateDialog);
 addCustomCategoryButton.addEventListener("click", addCustomCategory);
+popupTemplateSelect.addEventListener("change", () => {
+  const template = (currentState?.templates || []).find(
+    (candidate) => candidate.id === popupTemplateSelect.value
+  );
+  if (template) {
+    applyPopupTemplate(template);
+  } else {
+    renderPresetCategories();
+    customCategories = [];
+    renderCustomCategories();
+    popupProjectModeInputs.forEach((input) => {
+      input.checked = input.value === "single";
+    });
+  }
+});
 customCategoryName.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();

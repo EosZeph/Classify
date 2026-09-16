@@ -9,7 +9,9 @@ function enqueueMutation(mutator) {
 }
 
 function requireProject(state, projectId) {
-  const project = ArchiveStore.findProject(state, projectId);
+  const project = state.projects.find(
+    (candidate) => candidate.id === projectId
+  );
   if (!project) {
     throw new Error("找不到指定项目，可能已被删除。");
   }
@@ -22,6 +24,12 @@ function requireCategory(project, categoryId) {
     throw new Error("找不到指定类别，可能已被删除。");
   }
   return category;
+}
+
+function requireUnlocked(project) {
+  if (project.locked) {
+    throw new Error("项目已锁定，请先解锁后再删除。");
+  }
 }
 
 function updateActionBadge(state) {
@@ -71,6 +79,9 @@ async function handleMessage(message, sender) {
       if (payload.create) {
         workspaceUrl.searchParams.set("new", "1");
       }
+      if (payload.download) {
+        workspaceUrl.searchParams.set("download", "1");
+      }
       await chrome.tabs.create({ url: workspaceUrl.toString() });
       return true;
     }
@@ -115,8 +126,78 @@ async function handleMessage(message, sender) {
             project.activeGroupId = project.groups[0]?.id || null;
           }
         }
+        if (typeof payload.locked === "boolean") {
+          project.locked = payload.locked;
+        }
+        if (typeof payload.summary === "string") {
+          project.summary = ArchiveStore.cleanText(payload.summary, 50000);
+        }
+        if (typeof payload.ending === "string") {
+          project.ending = ArchiveStore.cleanText(payload.ending, 50000);
+        }
         ArchiveStore.touchProject(project);
         return project;
+      });
+    }
+
+    case "SAVE_TEMPLATE": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const template = {
+          id: ArchiveStore.createId("template"),
+          name:
+            ArchiveStore.cleanText(payload.name, 60) ||
+            `${project.name} 模板`,
+          mode: project.mode,
+          categories: project.categories.map((category) => ({
+            key: category.key,
+            name: category.name,
+            color: category.color,
+            description: category.description,
+            position: category.position
+          })),
+          createdAt: ArchiveStore.nowIso(),
+          updatedAt: ArchiveStore.nowIso()
+        };
+        state.templates.push(template);
+        return template;
+      });
+    }
+
+    case "UPDATE_TEMPLATE": {
+      return enqueueMutation((state) => {
+        const template = state.templates.find(
+          (candidate) => candidate.id === payload.templateId
+        );
+        if (!template) {
+          throw new Error("模板不存在或已被删除。");
+        }
+        template.name =
+          ArchiveStore.cleanText(payload.name, 60) || template.name;
+        template.updatedAt = ArchiveStore.nowIso();
+        return template;
+      });
+    }
+
+    case "DELETE_TEMPLATE": {
+      return enqueueMutation((state) => {
+        const index = state.templates.findIndex(
+          (candidate) => candidate.id === payload.templateId
+        );
+        if (index === -1) {
+          throw new Error("模板不存在或已被删除。");
+        }
+        state.templates.splice(index, 1);
+        return true;
+      });
+    }
+
+    case "CLEAR_ALL_PROJECTS": {
+      return enqueueMutation((state) => {
+        const count = state.projects.length;
+        state.projects = [];
+        state.activeProjectId = null;
+        return count;
       });
     }
 
@@ -137,6 +218,7 @@ async function handleMessage(message, sender) {
     case "DELETE_GROUP": {
       return enqueueMutation((state) => {
         const project = requireProject(state, payload.projectId);
+        requireUnlocked(project);
         const index = project.groups.findIndex(
           (group) => group.id === payload.groupId
         );
@@ -229,6 +311,7 @@ async function handleMessage(message, sender) {
     case "DELETE_GROUP_VALUE": {
       return enqueueMutation((state) => {
         const project = requireProject(state, payload.projectId);
+        requireUnlocked(project);
         const group = project.groups.find(
           (candidate) => candidate.id === payload.groupId
         );
@@ -244,6 +327,8 @@ async function handleMessage(message, sender) {
 
     case "DELETE_PROJECT": {
       return enqueueMutation((state) => {
+        const selectedProject = requireProject(state, payload.projectId);
+        requireUnlocked(selectedProject);
         const index = state.projects.findIndex(
           (project) => project.id === payload.projectId
         );
@@ -350,9 +435,39 @@ async function handleMessage(message, sender) {
       });
     }
 
+    case "REORDER_GROUPS": {
+      return enqueueMutation((state) => {
+        const project = requireProject(state, payload.projectId);
+        const orderedIds = Array.isArray(payload.orderedIds)
+          ? payload.orderedIds
+          : [];
+        const uniqueIds = new Set(orderedIds);
+        if (
+          orderedIds.length !== project.groups.length ||
+          uniqueIds.size !== project.groups.length
+        ) {
+          throw new Error("分组排序数据不完整，请刷新页面后重试。");
+        }
+
+        const groupMap = new Map(
+          project.groups.map((group) => [group.id, group])
+        );
+        project.groups = orderedIds.map((groupId) => {
+          const group = groupMap.get(groupId);
+          if (!group) {
+            throw new Error("分组排序中包含无效分组。");
+          }
+          return group;
+        });
+        ArchiveStore.touchProject(project);
+        return project.groups.map((group) => group.id);
+      });
+    }
+
     case "DELETE_CATEGORY": {
       return enqueueMutation((state) => {
         const project = requireProject(state, payload.projectId);
+        requireUnlocked(project);
         const index = project.categories.findIndex(
           (category) => category.id === payload.categoryId
         );
@@ -452,6 +567,7 @@ async function handleMessage(message, sender) {
     case "DELETE_ITEM": {
       return enqueueMutation((state) => {
         const project = requireProject(state, payload.projectId);
+        requireUnlocked(project);
         const category = requireCategory(project, payload.categoryId);
 
         if (project.mode === "multi") {

@@ -260,6 +260,202 @@
     });
   }
 
+  function columnName(index) {
+    let value = index + 1;
+    let name = "";
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
+  function createXlsxBlob(title, rows, merges = []) {
+    const sheetRows = rows
+      .map((row, rowIndex) => {
+        const cells = row
+          .map((value, columnIndex) => {
+            const reference = `${columnName(columnIndex)}${rowIndex + 1}`;
+            const style = rowIndex === 0 ? ' s="1"' : "";
+            return `<c r="${reference}" t="inlineStr"${style}><is><t xml:space="preserve">${escapeXml(
+              value ?? ""
+            )}</t></is></c>`;
+          })
+          .join("");
+        return `<row r="${rowIndex + 1}">${cells}</row>`;
+      })
+      .join("");
+
+    const columns = Array.from(
+      { length: Math.max(1, ...rows.map((row) => row.length)) },
+      (_, index) => `<col min="${index + 1}" max="${index + 1}" width="${
+        index === 0 ? 18 : 24
+      }" customWidth="1"/>`
+    ).join("");
+    const mergeXml = merges.length
+      ? `<mergeCells count="${merges.length}">${merges
+          .map((reference) => `<mergeCell ref="${escapeXml(reference)}"/>`)
+          .join("")}</mergeCells>`
+      : "";
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <cols>${columns}</cols>
+        <sheetData>${sheetRows}</sheetData>
+        ${mergeXml}
+      </worksheet>`;
+    const sheetName = escapeXml(
+      (title || "表格")
+        .replace(/[\\/?*[\]:]/g, "_")
+        .slice(0, 31)
+    );
+    const files = [
+      {
+        name: "[Content_Types].xml",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+            <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+            <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+          </Types>`
+      },
+      {
+        name: "_rels/.rels",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+          </Relationships>`
+      },
+      {
+        name: "xl/workbook.xml",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets>
+          </workbook>`
+      },
+      {
+        name: "xl/_rels/workbook.xml.rels",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+            <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+          </Relationships>`
+      },
+      {
+        name: "xl/styles.xml",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <fonts count="2">
+              <font><sz val="11"/><name val="Calibri"/></font>
+              <font><b/><sz val="11"/><name val="Calibri"/></font>
+            </fonts>
+            <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+            <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+            <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+            <cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1"/></cellXfs>
+          </styleSheet>`
+      },
+      {
+        name: "xl/worksheets/sheet1.xml",
+        content: sheetXml
+      }
+    ];
+    return new Blob([createZip(files)], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+  }
+
+  function createDocxStyledBlob(title, paragraphDefinitions) {
+    const titleXml = escapeXml(title || "归类采集");
+    const paragraphs = paragraphDefinitions
+      .map((paragraph) => {
+        if (paragraph.plain !== undefined) {
+          return `
+            <w:p>
+              <w:pPr><w:spacing w:after="80"/></w:pPr>
+              <w:r><w:t xml:space="preserve">${escapeXml(
+                paragraph.plain
+              )}</w:t></w:r>
+            </w:p>
+          `;
+        }
+
+        const runs = paragraph.segments
+          .map((segment, index) => {
+            const separator =
+              index < paragraph.segments.length - 1 ? "，" : paragraph.ending || "";
+            return `
+              <w:r>
+                <w:rPr><w:b/><w:color w:val="2156D8"/></w:rPr>
+                <w:t xml:space="preserve">${escapeXml(
+                  `${segment.label}：`
+                )}</w:t>
+              </w:r>
+              <w:r>
+                <w:rPr><w:color w:val="172033"/></w:rPr>
+                <w:t xml:space="preserve">${escapeXml(segment.text)}</w:t>
+              </w:r>
+              <w:r>
+                <w:rPr><w:color w:val="172033"/></w:rPr>
+                <w:t xml:space="preserve">${escapeXml(separator)}</w:t>
+              </w:r>
+            `;
+          })
+          .join("");
+        return `
+          <w:p>
+            <w:pPr><w:spacing w:after="80"/></w:pPr>
+            ${runs}
+          </w:p>
+        `;
+      })
+      .join("");
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr><w:spacing w:after="180"/></w:pPr>
+            <w:r>
+              <w:rPr><w:b/><w:sz w:val="32"/></w:rPr>
+              <w:t>${titleXml}</w:t>
+            </w:r>
+          </w:p>
+          ${paragraphs}
+          <w:sectPr>
+            <w:pgSz w:w="11906" w:h="16838"/>
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+          </w:sectPr>
+        </w:body>
+      </w:document>`;
+    const zip = createZip([
+      {
+        name: "[Content_Types].xml",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+          </Types>`
+      },
+      {
+        name: "_rels/.rels",
+        content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+          </Relationships>`
+      },
+      {
+        name: "word/document.xml",
+        content: documentXml
+      }
+    ]);
+    return new Blob([zip], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+  }
+
   function sanitizeFilename(value) {
     return (
       String(value || "")
@@ -284,6 +480,8 @@
   global.ArchiveDownload = {
     createDocxBlob,
     createDocxLinesBlob,
+    createDocxStyledBlob,
+    createXlsxBlob,
     createZip,
     sanitizeFilename,
     triggerDownload

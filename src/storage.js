@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "archiveState";
-  const SCHEMA_VERSION = 4;
+  const SCHEMA_VERSION = 5;
 
   const CATEGORY_TEMPLATES = [
     {
@@ -80,6 +80,7 @@
     return {
       version: SCHEMA_VERSION,
       projects: [],
+      templates: [],
       activeProjectId: null,
       collectionEnabled: true,
       sideDrawerVisible: true,
@@ -191,6 +192,9 @@
       id: createId("project"),
       name: safeName,
       mode: safeMode,
+      locked: false,
+      summary: "",
+      ending: "",
       createdAt: timestamp,
       updatedAt: timestamp,
       categories: createDefaultCategories(categoryDefinitions),
@@ -280,6 +284,9 @@
       id: cleanText(project.id, 120) || createId("project"),
       name,
       mode,
+      locked: project.locked === true,
+      summary: cleanText(project.summary, 50000),
+      ending: cleanText(project.ending, 50000),
       createdAt: cleanText(project.createdAt, 80) || timestamp,
       updatedAt: cleanText(project.updatedAt, 80) || timestamp,
       categories,
@@ -296,6 +303,11 @@
     const projects = Array.isArray(rawState.projects)
       ? rawState.projects.map(normalizeProject).filter(Boolean)
       : [];
+    const templates = Array.isArray(rawState.templates)
+      ? rawState.templates
+          .map(normalizeTemplate)
+          .filter(Boolean)
+      : [];
 
     const activeProjectId = projects.some(
       (project) => project.id === rawState.activeProjectId
@@ -306,6 +318,7 @@
     return {
       version: SCHEMA_VERSION,
       projects,
+      templates,
       activeProjectId,
       collectionEnabled: rawState.collectionEnabled !== false,
       sideDrawerVisible: rawState.sideDrawerVisible !== false,
@@ -314,6 +327,54 @@
           ? { ...rawState.migrations }
           : {},
       updatedAt: cleanText(rawState.updatedAt, 80) || nowIso()
+    };
+  }
+
+  function normalizeTemplate(template) {
+    if (!template || typeof template !== "object") {
+      return null;
+    }
+    const name = cleanText(template.name, 60);
+    if (!name) {
+      return null;
+    }
+    const timestamp = nowIso();
+    const mode = template.mode === "multi" ? "multi" : "single";
+    const categories = Array.isArray(template.categories)
+      ? template.categories
+          .map((category, index) => {
+            if (!category || typeof category !== "object") {
+              return null;
+            }
+            const categoryName = cleanText(category.name, 40);
+            if (!categoryName) {
+              return null;
+            }
+            return {
+              key: cleanText(category.key, 80) || "custom",
+              name: categoryName,
+              color: /^#[0-9a-f]{6}$/i.test(category.color)
+                ? category.color
+                : CATEGORY_TEMPLATES[index % CATEGORY_TEMPLATES.length].color,
+              description: cleanText(category.description, 160),
+              position: index
+            };
+          })
+          .filter(Boolean)
+      : createDefaultCategories().map((category) => ({
+          key: category.key,
+          name: category.name,
+          color: category.color,
+          description: category.description,
+          position: category.position
+        }));
+    return {
+      id: cleanText(template.id, 120) || createId("template"),
+      name,
+      mode,
+      categories,
+      createdAt: cleanText(template.createdAt, 80) || timestamp,
+      updatedAt: cleanText(template.updatedAt, 80) || timestamp
     };
   }
 
@@ -454,6 +515,7 @@
     isLegacyProjectName,
     mutate,
     normalizeState,
+    normalizeTemplate,
     nowIso,
     setState,
     touchProject
